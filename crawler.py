@@ -5,13 +5,6 @@ from sqlalchemy.orm import Session
 from models import News, Wiki
 import time
 import re
-from transformers import pipeline
-
-# 요약 모델 초기화 (한번만)
-try:
-    summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-except:
-    summarizer = None
 
 # 보안 키워드 데이터베이스
 SECURITY_KEYWORDS = {
