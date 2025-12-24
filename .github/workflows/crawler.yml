@@ -5,6 +5,9 @@ on:
     - cron: '0 23 * * *'  # 매일 한국시간 오전 8시 (UTC 23시)
   workflow_dispatch:  # 수동 실행 가능
 
+permissions:
+  contents: write
+
 jobs:
   crawl:
     runs-on: ubuntu-latest
@@ -12,6 +15,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -20,6 +25,7 @@ jobs:
         
     - name: Install dependencies
       run: |
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
         
     - name: Run crawler
@@ -27,8 +33,12 @@ jobs:
         python crawler.py
         
     - name: Commit and push if changed
+      if: always()
       run: |
         git config --global user.email "250818752+sysgate13-secure@users.noreply.github.com"
         git config --global user.name "sysgate13-secure"
         git add security_news.db
-        git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Auto-crawl: $(date +'%Y-%m-%d %H:%M')" && git push)
+        if ! git diff --cached --quiet; then
+          git commit -m "🤖 Auto-crawl: $(date +'%Y-%m-%d %H:%M')"
+          git push origin main
+        fi
