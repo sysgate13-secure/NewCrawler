@@ -238,74 +238,81 @@ def crawl_boannews(db: Session):
         print(f"보안뉴스 크롤링 오류: {e}")
         return 0
 
-def crawl_kisa(db: Session):
-    """KISA RSS 크롤링"""
-    url = "https://www.boho.or.kr/kr/bbs/list.do?bbsId=B0000133"
+def crawl_krcert(db: Session):
+    """KrCERT 보안공지 크롤링"""
+    url = "https://www.krcert.or.kr/data/secNoticeList.html"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
     
     try:
-        rss_url = "https://www.boannews.com/media/news_rss.xml"
-        response = requests.get(rss_url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
+        response.encoding = 'utf-8'
+        soup = BeautifulSoup(response.text, 'html.parser')
         
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'xml')
-            items = soup.find_all('item')[:10]
+        # KrCERT 테이블에서 뉴스 추출
+        table = soup.find('table', class_='artclTable')
+        if table:
+            rows = table.find_all('tr')[1:11]  # 상위 10개
             count = 0
             
-            for item in items:
+            for row in rows:
                 try:
-                    title = item.find('title').text if item.find('title') else ''
-                    link = item.find('link').text if item.find('link') else ''
-                    
-                    if not title or not link:
+                    cols = row.find_all('td')
+                    if len(cols) < 2:
                         continue
                     
+                    title_elem = cols[0].find('a')
+                    if not title_elem:
+                        continue
+                    
+                    title = title_elem.get_text(strip=True)
+                    link = title_elem.get('href', '')
+                    
+                    if not link.startswith('http'):
+                        link = 'https://www.krcert.or.kr' + link
+                    
+                    if not title or len(title) < 5:
+                        continue
+                    
+                    # 중복 체크
                     existing = db.query(News).filter(News.url == link).first()
                     if existing:
                         continue
                     
-                    # RSS는 summary가 없으므로 제목 기반으로 분류
-                    category = determine_category(title)
-
-                    wiki_existing = db.query(Wiki).filter(Wiki.title == title).first()
-                    if not wiki_existing:
-                        # 키워드 추출로 태그 생성
-                        tags = extract_keywords(title + ' ' + (summary or ''), top_n=6)
-                        wiki_preview = (summary[:200] + '...') if summary and len(summary) > 200 else (summary or '')
-                        wiki_content = f"출처: 보안뉴스\n원문: {link}\n\n요약:\n{(summary or '요약이 없습니다.')}\n\n설명: 이 항목은 자동으로 생성된 위키입니다. 필요하면 편집해 주세요."
-                        wiki = Wiki(
-                            title=title,
-                            category=CATEGORY_LABELS.get(category, category or "보안뉴스"),
-                            tags=','.join(tags),
-                            preview=wiki_preview,
-                            content=wiki_content,
-                            type="auto"
-                        )
-                        db.add(wiki)
-                        db.commit()
-                    # RSS 항목으로 생성되는 위키도 템플릿화
-                    if not wiki_existing:
-                        tags = extract_keywords(title, top_n=5)
-                        wiki_preview = ''
-                        wiki_content = f"출처: 보안뉴스 RSS\n원문: {link}\n\n요약: (자동 생성된 항목)\n\n설명: 이 항목은 RSS에서 자동 생성되었습니다. 필요하면 편집해 주세요."
-                        wiki = Wiki(
-                            title=title,
-                            category=category_labels.get(category, category or "보안뉴스 RSS"),
-                            tags=','.join(tags),
-                            preview=wiki_preview,
-                            content=wiki_content,
-                            type="auto"
-                        )
-                        db.add(wiki)
-                        db.commit()
+                    # 상세 페이지에서 요약 추출
+                    summary = ""
+                    try:
+                        article_resp = requests.get(link, headers=headers, timeout=10)
+                        article_resp.encoding = 'utf-8'
+                        article_soup = BeautifulSoup(article_resp.text, 'html.parser')
+                        
+                        content_div = article_soup.find('div', class_='cont')
+                        if content_div:
+                            p = content_div.find('p')
+                            if p:
+                                summary = p.get_text(strip=True)[:300]
+                    except:
+                        pass
+                    
+                    category = determine_category(title + ' ' + (summary or ''))
+                    
+                    news = News(
+                        title=title,
+                        url=link,
+                        source="KrCERT",
+                        summary=summary or "",
+                        category=category
+                    )
+                    db.add(news)
+                    db.commit()
                     
                     count += 1
-                    print(f"RSS 추가: {title[:50]}...")
+                    print(f"KrCERT 추가: {title[:50]}...")
+                    time.sleep(0.5)
                     
                 except Exception as e:
-                    print(f"RSS 항목 오류: {e}")
+                    print(f"KrCERT 항목 오류: {e}")
                     continue
             
             return count
@@ -313,7 +320,142 @@ def crawl_kisa(db: Session):
         return 0
         
     except Exception as e:
-        print(f"RSS 크롤링 오류: {e}")
+        print(f"KrCERT 크롤링 오류: {e}")
+        return 0
+
+def crawl_zdnet(db: Session):
+    """ZDNet 보안 뉴스 크롤링"""
+    url = "https://www.zdnet.co.kr/news/security/"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.encoding = 'utf-8'
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # ZDNet 기사 찾기
+        articles = soup.find_all('article', class_='card-item')[:10]
+        count = 0
+        
+        for article in articles:
+            try:
+                title_elem = article.find('h2')
+                link_elem = article.find('a')
+                
+                if not title_elem or not link_elem:
+                    continue
+                
+                title = title_elem.get_text(strip=True)
+                link = link_elem.get('href', '')
+                
+                if not link.startswith('http'):
+                    link = 'https://www.zdnet.co.kr' + link
+                
+                if not title or len(title) < 5:
+                    continue
+                
+                # 중복 체크
+                existing = db.query(News).filter(News.url == link).first()
+                if existing:
+                    continue
+                
+                # 요약 추출
+                summary_elem = article.find('p', class_='desc')
+                summary = summary_elem.get_text(strip=True) if summary_elem else ""
+                
+                category = determine_category(title + ' ' + (summary or ''))
+                
+                news = News(
+                    title=title,
+                    url=link,
+                    source="ZDNet",
+                    summary=summary[:300] if summary else "",
+                    category=category
+                )
+                db.add(news)
+                db.commit()
+                
+                count += 1
+                print(f"ZDNet 추가: {title[:50]}...")
+                time.sleep(0.5)
+                
+            except Exception as e:
+                print(f"ZDNet 항목 오류: {e}")
+                continue
+        
+        return count
+        
+    except Exception as e:
+        print(f"ZDNet 크롤링 오류: {e}")
+        return 0
+
+def crawl_cisa(db: Session):
+    """CISA (미국 사이버보안청) 공지 크롤링"""
+    url = "https://www.cisa.gov/news-events/alerts"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.encoding = 'utf-8'
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # CISA 알림 찾기
+        alerts = soup.find_all('div', class_='alert-item')[:10]
+        count = 0
+        
+        for alert in alerts:
+            try:
+                title_elem = alert.find('h3')
+                link_elem = alert.find('a')
+                
+                if not title_elem or not link_elem:
+                    continue
+                
+                title = title_elem.get_text(strip=True)
+                link = link_elem.get('href', '')
+                
+                if not link.startswith('http'):
+                    link = 'https://www.cisa.gov' + link
+                
+                if not title or len(title) < 5:
+                    continue
+                
+                # 중복 체크
+                existing = db.query(News).filter(News.url == link).first()
+                if existing:
+                    continue
+                
+                summary_elem = alert.find('p')
+                summary = summary_elem.get_text(strip=True) if summary_elem else ""
+                
+                category = determine_category(title + ' ' + (summary or ''))
+                
+                news = News(
+                    title=title,
+                    url=link,
+                    source="CISA",
+                    summary=summary[:300] if summary else "",
+                    category=category
+                )
+                db.add(news)
+                db.commit()
+                
+                count += 1
+                print(f"CISA 추가: {title[:50]}...")
+                time.sleep(0.5)
+                
+            except Exception as e:
+                print(f"CISA 항목 오류: {e}")
+                continue
+        
+        return count
+        
+    except Exception as e:
+        print(f"CISA 크롤링 오류: {e}")
         return 0
 
 def crawl_all(db: Session):
@@ -321,12 +463,21 @@ def crawl_all(db: Session):
     print("=== 크롤링 시작 ===")
     total = 0
     
-    print("\n[1/2] 보안뉴스 크롤링...")
+    print("\n[1/5] 보안뉴스 크롤링...")
     total += crawl_boannews(db)
     time.sleep(2)
     
-    print("\n[2/2] 보안뉴스 RSS...")
-    total += crawl_kisa(db)
+    print("\n[2/5] KrCERT 보안공지...")
+    total += crawl_krcert(db)
+    time.sleep(2)
+    
+    print("\n[3/5] ZDNet 보안 뉴스...")
+    total += crawl_zdnet(db)
+    time.sleep(2)
+    
+    print("\n[4/5] CISA 보안 공지...")
+    total += crawl_cisa(db)
+    time.sleep(2)
     
     print(f"\n=== 크롤링 완료: 총 {total}개 추가 ===")
     return total
