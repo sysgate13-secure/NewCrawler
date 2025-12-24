@@ -5,6 +5,13 @@ from sqlalchemy.orm import Session
 from models import News, Wiki
 import time
 import re
+from transformers import pipeline
+
+# 요약 모델 초기화 (한번만)
+try:
+    summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+except:
+    summarizer = None
 
 # 보안 키워드 데이터베이스
 SECURITY_KEYWORDS = {
@@ -38,6 +45,38 @@ def extract_keywords(text, top_n=5):
         items = sorted(freq.items(), key=lambda x: x[1], reverse=True)
         return [w for w, _ in items[:top_n]]
     return []
+
+
+# 텍스트 요약 함수 (3-5줄로 자동 요약)
+def summarize_text(text, target_length=100):
+    """
+    텍스트를 3-5줄로 요약합니다.
+    """
+    if not text or len(text) < 50:
+        return text
+    
+    # 문장 분리
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    
+    # 문장이 3-5개면 그대로 반환
+    if 3 <= len(sentences) <= 5:
+        return ' '.join(sentences)
+    
+    # 문장이 너무 많으면 처음 4-5개 문장으로 자르기
+    if len(sentences) > 5:
+        # 문장의 길이를 고려해서 3-5개 선택
+        total_length = 0
+        selected = []
+        for sent in sentences:
+            if total_length + len(sent) > target_length and len(selected) >= 3:
+                break
+            selected.append(sent)
+            total_length += len(sent)
+        return ' '.join(selected) if selected else ' '.join(sentences[:5])
+    
+    # 문장이 1-2개면 그대로 반환
+    return ' '.join(sentences)
 
 
 # 카테고리 키워드 매핑 (우선순위 순서대로 체크)
@@ -150,6 +189,10 @@ def crawl_boannews(db: Session):
                 except Exception as e:
                     print(f"요약 추출 오류({title[:30]}...): {e}")
                     summary = ""
+
+                # 추출한 요약을 3-5줄로 자동 요약
+                if summary and len(summary) > 50:
+                    summary = summarize_text(summary)
 
                 # 중복 체크
                 existing = db.query(News).filter(News.url == link).first()
