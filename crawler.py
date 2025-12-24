@@ -458,16 +458,178 @@ def crawl_cisa(db: Session):
         print(f"CISA 크롤링 오류: {e}")
         return 0
 
+
+# 범용 크롤러 헬퍼 및 해외 사이트 크롤러들
+def _generic_crawl(db: Session, list_url: str, domain: str, source_label: str, max_items: int = 8):
+    """범용 크롤러: 리스트 페이지에서 같은 도메인의 링크를 추출해 개별 기사에서 요약/제목을 수집합니다.
+    실패 시 -1을 반환하고, 정상 수행 시 추가된 항목 수를 반환합니다.
+    """
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        resp = requests.get(list_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+
+        links = []
+        for a in soup.find_all('a', href=True):
+            href = a['href']
+            if href.startswith('/'):
+                href = requests.compat.urljoin(list_url, href)
+            if domain in href and href not in links:
+                links.append(href)
+            if len(links) >= max_items * 3:
+                break
+
+        # 좁혀서 최대 max_items 개의 고유 기사 링크 선택
+        selected = []
+        for l in links:
+            if any(x in l for x in ['#', '/tag/', '/category/', '/comments', '/page/']):
+                continue
+            if l not in selected:
+                selected.append(l)
+            if len(selected) >= max_items:
+                break
+
+        added = 0
+        for link in selected:
+            try:
+                aresp = requests.get(link, headers=headers, timeout=10)
+                aresp.raise_for_status()
+                asoup = BeautifulSoup(aresp.text, 'html.parser')
+
+                title = None
+                # 우선 메타 og:title, 아니면 h1, 아니면 <title>
+                meta_og = asoup.find('meta', property='og:title')
+                if meta_og and meta_og.get('content'):
+                    title = meta_og.get('content').strip()
+                if not title:
+                    h1 = asoup.find('h1')
+                    if h1 and h1.get_text(strip=True):
+                        title = h1.get_text(strip=True)
+                if not title:
+                    if asoup.title and asoup.title.string:
+                        title = asoup.title.string.strip()
+                if not title:
+                    continue
+
+                # 요약: og:description 또는 meta description 또는 첫 번째 유효 p
+                summary = ''
+                meta_desc = asoup.find('meta', attrs={'name': 'description'})
+                meta_og_desc = asoup.find('meta', property='og:description')
+                if meta_og_desc and meta_og_desc.get('content'):
+                    summary = meta_og_desc.get('content').strip()
+                elif meta_desc and meta_desc.get('content'):
+                    summary = meta_desc.get('content').strip()
+                else:
+                    p = asoup.find('p')
+                    if p and p.get_text(strip=True):
+                        summary = p.get_text(strip=True)
+
+                # 카테고리 판별
+                category = determine_category(title + ' ' + (summary or ''))
+
+                # 중복 체크
+                existing = db.query(News).filter(News.url == link).first()
+                if existing:
+                    continue
+
+                news = News(
+                    title=title,
+                    source=source_label,
+                    date=datetime.now().strftime("%Y-%m-%d"),
+                    summary=summarize_text(summary) if summary else "",
+                    category=category,
+                    url=link
+                )
+                db.add(news)
+                db.commit()
+
+                # 위키 자동 생성
+                wiki_existing = db.query(Wiki).filter(Wiki.title == title).first()
+                if not wiki_existing:
+                    wiki_preview = (summary[:200] + '...') if summary and len(summary) > 200 else (summary or '')
+                    wiki_content = f"출처: {source_label}\n원문: {link}\n\n요약:\n{(summary or '요약이 없습니다.')}\n\n설명: 이 항목은 자동으로 생성된 위키입니다. 필요하면 편집해 주세요."
+                    wiki = Wiki(
+                        title=title,
+                        category=CATEGORY_LABELS.get(category, category or '기타'),
+                        preview=wiki_preview,
+                        content=wiki_content,
+                        type="auto"
+                    )
+                    db.add(wiki)
+                    db.commit()
+
+                added += 1
+                print(f"{source_label} 추가: {title[:60]}...")
+                time.sleep(0.6)
+
+            except Exception as e:
+                print(f"{source_label} 항목 오류: {e}")
+                continue
+
+        return added
+    except Exception as e:
+        print(f"{source_label} 크롤링 오류: {e}")
+        return -1
+
+
+def crawl_thehackernews(db: Session):
+    return _generic_crawl(db, 'https://thehackernews.com/', 'thehackernews.com', 'The Hacker News', max_items=6)
+
+
+def crawl_krebs(db: Session):
+    return _generic_crawl(db, 'https://krebsonsecurity.com/', 'krebsonsecurity.com', 'KrebsOnSecurity', max_items=6)
+
+
+def crawl_bleepingcomputer(db: Session):
+    return _generic_crawl(db, 'https://www.bleepingcomputer.com/', 'bleepingcomputer.com', 'BleepingComputer', max_items=6)
+
+
+def crawl_securityweek(db: Session):
+    return _generic_crawl(db, 'https://www.securityweek.com/', 'securityweek.com', 'SecurityWeek', max_items=6)
+
+
+def crawl_darkreading(db: Session):
+    return _generic_crawl(db, 'https://www.darkreading.com/', 'darkreading.com', 'DarkReading', max_items=6)
+
+
 def crawl_all(db: Session):
     """모든 소스 크롤링"""
     print("=== 크롤링 시작 ===")
     total = 0
-    
-    # 현재 안정적으로 동작하는 소스만 실행하도록 제한 (추후 재활성화 가능)
-    print("\n[1/1] 보안뉴스 크롤링...")
-    total += crawl_boannews(db)
+
+    # 보안뉴스는 항상 시도
+    print("\n[1] 보안뉴스 크롤링...")
+    res = crawl_boannews(db)
+    if res == -1:
+        print("보안뉴스 크롤링 실패 — 건너뜁니다.")
+    else:
+        total += res
     time.sleep(2)
-    
+
+    # 해외 사이트 목록 — 실패 시 추가하지 않음
+    overseas = [
+        (crawl_thehackernews, 'The Hacker News'),
+        (crawl_krebs, 'KrebsOnSecurity'),
+        (crawl_bleepingcomputer, 'BleepingComputer'),
+        (crawl_securityweek, 'SecurityWeek'),
+        (crawl_darkreading, 'DarkReading'),
+    ]
+
+    idx = 2
+    for func, name in overseas:
+        print(f"\n[{idx}] {name} 크롤링...")
+        try:
+            r = func(db)
+            if r == -1:
+                print(f"{name} 크롤링 실패 — 결과에 추가하지 않음")
+            else:
+                total += r
+            time.sleep(2)
+        except Exception as e:
+            print(f"{name} 호출 중 예외: {e}")
+        idx += 1
+
     print(f"\n=== 크롤링 완료: 총 {total}개 추가 ===")
     return total
 
