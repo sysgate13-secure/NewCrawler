@@ -20,7 +20,18 @@ class Wiki(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     category = Column(String, nullable=False)
+    tags = Column(String, nullable=True)
     preview = Column(Text)
     content = Column(Text)
     type = Column(String)
     created_at = Column(DateTime, default=datetime.now)
+
+class CrawlLog(Base):
+    __tablename__ = "crawl_log"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    status = Column(String)  # 'success', 'failed', 'running'
+    count = Column(Integer, default=0)
+    message = Column(Text)
+    started_at = Column(DateTime, default=datetime.now)
+    completed_at = Column(DateTime, nullable=True)

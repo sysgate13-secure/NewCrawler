@@ -6,6 +6,19 @@ from datetime import datetime
 Base.metadata.create_all(bind=engine)
 db = SessionLocal()
 
+# SQLite: 위키 테이블에 `tags` 컬럼이 없으면 추가
+from sqlalchemy import text
+
+with engine.connect() as conn:
+    cols = conn.execute(text("PRAGMA table_info('wiki')")).fetchall()
+    col_names = [c[1] for c in cols]
+    if 'tags' not in col_names:
+        try:
+            conn.execute(text("ALTER TABLE wiki ADD COLUMN tags TEXT"))
+            print('✅ wiki.tags 컬럼 추가됨')
+        except Exception as e:
+            print('wiki.tags 컬럼 추가 실패:', e)
+
 # 샘플 뉴스 데이터
 sample_news = [
     {
