@@ -463,20 +463,9 @@ def crawl_all(db: Session):
     print("=== 크롤링 시작 ===")
     total = 0
     
-    print("\n[1/5] 보안뉴스 크롤링...")
+    # 현재 안정적으로 동작하는 소스만 실행하도록 제한 (추후 재활성화 가능)
+    print("\n[1/1] 보안뉴스 크롤링...")
     total += crawl_boannews(db)
-    time.sleep(2)
-    
-    print("\n[2/5] KrCERT 보안공지...")
-    total += crawl_krcert(db)
-    time.sleep(2)
-    
-    print("\n[3/5] ZDNet 보안 뉴스...")
-    total += crawl_zdnet(db)
-    time.sleep(2)
-    
-    print("\n[4/5] CISA 보안 공지...")
-    total += crawl_cisa(db)
     time.sleep(2)
     
     print(f"\n=== 크롤링 완료: 총 {total}개 추가 ===")
