@@ -1,13 +1,22 @@
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, Request, BackgroundTasks
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 from database import engine, get_db, Base
-from models import News, Wiki, CrawlLog
+from models import News, Wiki
 from crawler import crawl_all
 from datetime import datetime
 import os
+
+# Elasticsearch와 AI 요약 임포트 (선택적)
+try:
+    from elasticsearch_client import create_indices, index_news, index_wiki, search_all, get_es_client
+    from ai_summarizer import summarize_news
+    ES_ENABLED = True
+except Exception as e:
+    print(f"⚠️ Elasticsearch/AI 기능 비활성화: {e}")
+    ES_ENABLED = False
 
 # DB 테이블 생성
 Base.metadata.create_all(bind=engine)
@@ -17,9 +26,19 @@ app = FastAPI(title="보안 뉴스 플랫폼")
 # 템플릿 설정
 templates = Jinja2Templates(directory="templates")
 
-# 정적 파일 설정 (있으면)
+# 정적 파일 설정
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.on_event("startup")
+async def startup_event():
+    """서버 시작 시 Elasticsearch 인덱스 생성"""
+    if ES_ENABLED:
+        try:
+            create_indices()
+            print("✅ Elasticsearch 인덱스 준비 완료")
+        except Exception as e:
+            print(f"⚠️ Elasticsearch 초기화 실패: {e}")
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db)):
@@ -29,7 +48,8 @@ async def home(request: Request, db: Session = Depends(get_db)):
     
     stats = {
         "news_count": db.query(News).count(),
-        "wiki_count": db.query(Wiki).count()
+        "wiki_count": db.query(Wiki).count(),
+        "es_enabled": ES_ENABLED
     }
     
     return templates.TemplateResponse("index.html", {
@@ -43,33 +63,6 @@ async def home(request: Request, db: Session = Depends(get_db)):
 async def get_news(db: Session = Depends(get_db)):
     """뉴스 API"""
     news = db.query(News).order_by(News.created_at.desc()).limit(50).all()
-    return [
-        {
-            "id": n.id,
-            "title": n.title,
-            "source": n.source,
-            "date": n.date,
-            "summary": n.summary,
-            "category": n.category,
-            "url": n.url
-        }
-        for n in news
-    ]
-
-@app.get("/api/news/search")
-async def search_news(q: str = "", category: str = "", db: Session = Depends(get_db)):
-    """뉴스 검색 (제목, 요약, 카테고리 기준)"""
-    query = db.query(News)
-    
-    if q:
-        query = query.filter(
-            (News.title.contains(q)) | (News.summary.contains(q))
-        )
-    
-    if category:
-        query = query.filter(News.category == category)
-    
-    news = query.order_by(News.created_at.desc()).limit(50).all()
     return [
         {
             "id": n.id,
@@ -98,123 +91,77 @@ async def get_wiki(db: Session = Depends(get_db)):
         for w in wikis
     ]
 
-@app.get("/api/wiki/search")
-async def search_wiki(q: str = "", category: str = "", db: Session = Depends(get_db)):
-    """위키 검색 (제목, 카테고리 기준)"""
-    query = db.query(Wiki)
-    
-    if q:
-        query = query.filter(
-            (Wiki.title.contains(q)) | (Wiki.preview.contains(q))
-        )
-    
-    if category:
-        query = query.filter(Wiki.category == category)
-    
-    wikis = query.order_by(Wiki.created_at.desc()).all()
-    return [
-        {
-            "id": w.id,
-            "title": w.title,
-            "category": w.category,
-            "preview": w.preview,
-            "type": w.type
-        }
-        for w in wikis
-    ]
-
 @app.post("/api/crawl")
-async def run_crawler(db: Session = Depends(get_db)):
-    """크롤링 실행 + 로그 기록"""
-    log = CrawlLog(status="running", message="크롤링 시작")
-    db.add(log)
-    db.commit()
-    
+async def run_crawler(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """크롤링 실행"""
     try:
         count = crawl_all(db)
-        log.status = "success"
-        log.count = count
-        log.completed_at = datetime.now()
-        log.message = f"크롤링 완료: {count}개 추가"
-        db.commit()
+        
+        # Elasticsearch에 인덱싱
+        if ES_ENABLED:
+            background_tasks.add_task(reindex_all_news)
+        
         return {"success": True, "count": count}
     except Exception as e:
-        log.status = "failed"
-        log.completed_at = datetime.now()
-        log.message = str(e)
-        db.commit()
         return {"success": False, "error": str(e)}
 
-@app.get("/api/crawl/status")
-async def get_crawl_status(db: Session = Depends(get_db)):
-    """최근 크롤링 상태 조회"""
-    recent = db.query(CrawlLog).order_by(CrawlLog.started_at.desc()).first()
-    if not recent:
-        return {"status": "not_started", "message": "크롤링 이력 없음"}
+@app.post("/api/news/{news_id}/summarize")
+async def summarize_news_endpoint(news_id: int, db: Session = Depends(get_db)):
+    """뉴스 AI 요약 생성"""
+    if not ES_ENABLED:
+        return {"success": False, "error": "AI 기능이 비활성화되어 있습니다"}
+    
+    news = db.query(News).filter(News.id == news_id).first()
+    if not news:
+        return {"success": False, "error": "뉴스를 찾을 수 없습니다"}
+    
+    if news.summary:
+        return {"success": True, "summary": news.summary}
+    
+    # AI 요약 생성
+    summary = summarize_news(news.title, news.url)
+    if summary:
+        news.summary = summary
+        db.commit()
+        
+        # ES 업데이트
+        if ES_ENABLED:
+            index_news(news)
+        
+        return {"success": True, "summary": summary}
+    else:
+        return {"success": False, "error": "요약 생성 실패"}
+
+@app.get("/api/search")
+async def search(q: str, db: Session = Depends(get_db)):
+    """통합 검색 (Elasticsearch 사용)"""
+    if not q:
+        return {"news": [], "wiki": []}
+    
+    if ES_ENABLED:
+        try:
+            results = search_all(q)
+            return results
+        except Exception as e:
+            print(f"ES 검색 오류: {e}")
+    
+    # Fallback: SQLite 검색
+    news = db.query(News).filter(
+        (News.title.contains(q)) | (News.summary.contains(q))
+    ).limit(20).all()
+    
+    wikis = db.query(Wiki).filter(
+        (Wiki.title.contains(q)) | (Wiki.preview.contains(q)) | (Wiki.content.contains(q))
+    ).limit(20).all()
     
     return {
-        "status": recent.status,
-        "message": recent.message,
-        "count": recent.count,
-        "started_at": recent.started_at.isoformat(),
-        "completed_at": recent.completed_at.isoformat() if recent.completed_at else None
-    }
-
-@app.get("/api/crawl/history")
-async def get_crawl_history(limit: int = 10, db: Session = Depends(get_db)):
-    """크롤링 이력 조회"""
-    logs = db.query(CrawlLog).order_by(CrawlLog.started_at.desc()).limit(limit).all()
-    return [
-        {
-            "id": log.id,
-            "status": log.status,
-            "count": log.count,
-            "message": log.message,
-            "started_at": log.started_at.isoformat(),
-            "completed_at": log.completed_at.isoformat() if log.completed_at else None
-        }
-        for log in logs
-    ]
-
-@app.get("/api/stats/categories")
-async def get_category_stats(db: Session = Depends(get_db)):
-    """카테고리별 통계"""
-    from sqlalchemy import func
-    
-    news_by_cat = db.query(News.category, func.count(News.id)).group_by(News.category).all()
-    wiki_by_cat = db.query(Wiki.category, func.count(Wiki.id)).group_by(Wiki.category).all()
-    
-    return {
-        "news_categories": {cat: count for cat, count in news_by_cat},
-        "wiki_categories": {cat: count for cat, count in wiki_by_cat}
+        "news": [{"id": n.id, "title": n.title, "source": n.source, "summary": n.summary, "url": n.url} for n in news],
+        "wiki": [{"id": w.id, "title": w.title, "category": w.category, "preview": w.preview} for w in wikis]
     }
 
 @app.post("/api/wiki/add")
-async def add_wiki(
-    title: str,
-    category: str,
-    preview: str,
-    content: str = "",
-    type: str = "",
-    db: Session = Depends(get_db)
-):
+async def add_wiki(request: Request, db: Session = Depends(get_db)):
     """위키 추가"""
-    wiki = Wiki(
-        title=title,
-        category=category,
-        preview=preview,
-        content=content,
-        type=type
-    )
-    db.add(wiki)
-    db.commit()
-    return {"success": True, "id": wiki.id}
-@app.post("/api/wiki/add")
-async def add_wiki(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """위키 추가 (폼 데이터)"""
     form = await request.form()
     
     wiki = Wiki(
@@ -226,6 +173,13 @@ async def add_wiki(
     )
     db.add(wiki)
     db.commit()
+    
+    # ES 인덱싱
+    if ES_ENABLED:
+        try:
+            index_wiki(wiki)
+        except Exception as e:
+            print(f"ES 인덱싱 오류: {e}")
     
     return JSONResponse({
         "success": True, 
@@ -241,3 +195,50 @@ async def wiki_manage(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "wikis": wikis
     })
+
+@app.get("/wiki/{wiki_id}", response_class=HTMLResponse)
+async def wiki_detail(wiki_id: int, request: Request, db: Session = Depends(get_db)):
+    """위키 상세 페이지"""
+    wiki = db.query(Wiki).filter(Wiki.id == wiki_id).first()
+    if not wiki:
+        return JSONResponse({"error": "위키를 찾을 수 없습니다"}, status_code=404)
+    
+    return templates.TemplateResponse("wiki_detail.html", {
+        "request": request,
+        "wiki": wiki
+    })
+
+def reindex_all_news():
+    """모든 뉴스를 Elasticsearch에 재인덱싱"""
+    if not ES_ENABLED:
+        return
+    
+    db = next(get_db())
+    try:
+        news_list = db.query(News).all()
+        for news in news_list:
+            index_news(news)
+        print(f"✅ {len(news_list)}개 뉴스 인덱싱 완료")
+    except Exception as e:
+        print(f"인덱싱 오류: {e}")
+    finally:
+        db.close()
+
+@app.get("/health")
+async def health_check():
+    """헬스 체크"""
+    es_status = "disabled"
+    if ES_ENABLED:
+        try:
+            es = get_es_client()
+            if es.ping():
+                es_status = "ok"
+            else:
+                es_status = "error"
+        except:
+            es_status = "error"
+    
+    return {
+        "status": "ok",
+        "elasticsearch": es_status
+    }
