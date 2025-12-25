@@ -1,5 +1,5 @@
-from database import SessionLocal
-from models import Wiki
+from app.database import SessionLocal
+from app.models import Wiki
 from datetime import datetime
 
 db = SessionLocal()

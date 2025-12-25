@@ -3,16 +3,19 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
-from database import engine, get_db, Base
-from models import News, Wiki
-from crawler import crawl_all
+from app.database import engine, get_db, Base
+from app.models import News, Wiki
+from crawler.crawler import crawl_all
 from datetime import datetime
 import os
+from fastapi import FastAPI, Depends, Request, BackgroundTasks
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 # Elasticsearch와 AI 요약 임포트 (선택적)
 try:
-    from elasticsearch_client import create_indices, index_news, index_wiki, search_all, get_es_client
-    from ai_summarizer import summarize_news
+    from app.elasticsearch_client import create_indices, index_news, index_wiki, search_all, get_es_client
+    from app.ai_summarizer import summarize_news
     ES_ENABLED = True
 except Exception as e:
     print(f"⚠️ Elasticsearch/AI 기능 비활성화: {e}")
@@ -23,12 +26,15 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="보안 뉴스 플랫폼")
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # 템플릿 설정
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # 정적 파일 설정
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+static_path = os.path.join(BASE_DIR, "static")
+if os.path.exists(static_path):
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 @app.on_event("startup")
 async def startup_event():

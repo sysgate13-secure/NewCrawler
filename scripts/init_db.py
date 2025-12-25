@@ -1,5 +1,5 @@
-from database import SessionLocal, engine, Base
-from models import News, Wiki
+from app.database import SessionLocal, engine, Base
+from app.models import News, Wiki
 from datetime import datetime
 
 # DB 초기화

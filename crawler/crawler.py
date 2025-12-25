@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from sqlalchemy.orm import Session
-from models import News, Wiki
+from app.models import News, Wiki
 import time
 import re
 
@@ -634,7 +634,7 @@ def crawl_all(db: Session):
     return total
 
 if __name__ == "__main__":
-    from database import SessionLocal
+    from app.database import SessionLocal
     db = SessionLocal()
     crawl_all(db)
     db.close()

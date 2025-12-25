@@ -1,5 +1,5 @@
-from database import SessionLocal
-from models import News, Wiki
+from app.database import SessionLocal
+from app.models import News, Wiki
 from sqlalchemy import desc
 
 def show():

@@ -3,9 +3,9 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from database import SessionLocal
-from models import News, Wiki
-from crawler import determine_category, extract_keywords
+from app.database import SessionLocal
+from app.models import News, Wiki
+from crawler.crawler import determine_category, extract_keywords
 
 
 def main():

@@ -1,9 +1,9 @@
 import os, sys
 # Ensure project root is in path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from database import SessionLocal
+from app.database import SessionLocal
 from sqlalchemy import desc
-from models import Wiki
+from app.models import Wiki
 
 def main():
     db = SessionLocal()
