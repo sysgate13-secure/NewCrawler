@@ -51,7 +51,7 @@ cp .env.example .env
 docker-compose up -d
 
 # 4. 보안 지식 추가
-docker-compose exec app python add_security_knowledge.py
+docker-compose exec app python scripts/add_security_knowledge.py
 
 # 5. 접속
 http://localhost:8000
@@ -71,11 +71,11 @@ cp .env.example .env
 # OPENAI_API_KEY 입력
 
 # 4. DB 초기화 및 지식 추가
-python init_db.py
-python add_security_knowledge.py
+python scripts/init_db.py
+python scripts/add_security_knowledge.py
 
 # 5. 서버 실행
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 
 # 6. 접속
 http://localhost:8000

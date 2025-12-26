@@ -1,8 +1,8 @@
-# 2. DB 초기화
-python init_db.py
+# 2. DB 초기화 (필요시)
+# python scripts/init_db.py
 
 # 3. 서버 실행
-uvicorn main:app --reload
+uvicorn app.main:app --reload --port 8000
 
 # 4. 브라우저에서 접속
 http://localhost:8000

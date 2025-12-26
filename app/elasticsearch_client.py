@@ -5,8 +5,8 @@ import os
 ES_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
 
 def get_es_client():
-    """Elasticsearch 클라이언트 생성"""
-    return Elasticsearch([ES_URL])
+    """Elasticsearch 클라이언트 생성 (연결 타임아웃 설정)"""
+    return Elasticsearch([ES_URL], request_timeout=5)
 
 def create_indices():
     """인덱스 생성 (한글 형태소 분석기 nori 사용)"""

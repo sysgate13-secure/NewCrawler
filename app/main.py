@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import engine, get_db, Base
 from app.models import News, Wiki
 from crawler.crawler import crawl_all
+from data_utils import get_wiki_preview, get_wiki_highlights, clean_news_summary
 from datetime import datetime
 import os
 from fastapi import FastAPI, Depends, Request, BackgroundTasks
@@ -18,7 +19,7 @@ try:
     from app.ai_summarizer import summarize_news
     ES_ENABLED = True
 except Exception as e:
-    print(f"⚠️ Elasticsearch/AI 기능 비활성화: {e}")
+    print(f"[WARNING] Elasticsearch/AI disabled: {e}")
     ES_ENABLED = False
 
 # DB 테이블 생성
@@ -31,6 +32,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 템플릿 설정
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+# Jinja2 커스텀 필터 등록
+templates.env.filters['wiki_preview'] = lambda wiki, mode='short': get_wiki_preview(wiki, mode)
+templates.env.filters['clean_summary'] = clean_news_summary
+
 # 정적 파일 설정
 static_path = os.path.join(BASE_DIR, "static")
 if os.path.exists(static_path):
@@ -38,13 +43,18 @@ if os.path.exists(static_path):
 
 @app.on_event("startup")
 async def startup_event():
-    """서버 시작 시 Elasticsearch 인덱스 생성"""
+    """서버 시작 시 Elasticsearch 인덱스 생성 (비동기 수행)"""
     if ES_ENABLED:
-        try:
-            create_indices()
-            print("✅ Elasticsearch 인덱스 준비 완료")
-        except Exception as e:
-            print(f"⚠️ Elasticsearch 초기화 실패: {e}")
+        import threading
+        def init_es():
+            try:
+                create_indices()
+                print("✅ Elasticsearch 인덱스 준비 완료")
+            except Exception as e:
+                print(f"⚠️ Elasticsearch 초기화 실패 (서버는 계속 실행됨): {e}")
+        
+        # 메인 루프를 방해하지 않도록 별도 스레드에서 실행
+        threading.Thread(target=init_es, daemon=True).start()
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db)):
