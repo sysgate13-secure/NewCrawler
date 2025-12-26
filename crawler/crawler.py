@@ -601,10 +601,13 @@ def crawl_infosecurity(db: Session):
 
 def crawl_all(db: Session):
     """모든 소스 크롤링"""
-    print("=== 크롤링 시작 ===")
+    start_time = datetime.now()
+    print(f"\n[🚀] {start_time.strftime('%Y-%m-%d %H:%M:%S')} - 크롤링을 시작합니다. 잠시만 기다려 주세요...")
+    print("==================================================")
+    
     total = 0
 
-    print("\n[1] 보안뉴스 크롤링...")
+    print("\n[1] 국내 보안뉴스 수집 중...")
     res = crawl_boannews(db)
     if res != -1: total += res
     time.sleep(1)
@@ -619,16 +622,24 @@ def crawl_all(db: Session):
 
     idx = 2
     for func, name in overseas:
-        print(f"\n[{idx}] {name} 크롤링...")
+        print(f"\n[{idx}] {name} 해외 소스 수집 중...")
         try:
             r = func(db)
             if r != -1: total += r
             time.sleep(1)
         except Exception as e:
-            print(f"{name} 오류: {e}")
+            print(f"❌ {name} 오류: {e}")
         idx += 1
 
-    print(f"\n=== 크롤링 완료: 총 {total}개 추가 ===")
+    end_time = datetime.now()
+    duration = end_time - start_time
+    minutes, seconds = divmod(duration.seconds, 60)
+    
+    print("\n==================================================")
+    print(f"[✅] {end_time.strftime('%Y-%m-%d %H:%M:%S')} - 크롤링 마무리함.")
+    print(f"[⏱️] 총 소요 시간: {minutes}분 {seconds}초")
+    print(f"[📊] 새로 추가된 항목: 총 {total}개")
+    print("==================================================\n")
     return total
 
 if __name__ == "__main__":
