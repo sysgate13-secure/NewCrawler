@@ -205,6 +205,57 @@ async def add_wiki(request: Request, db: Session = Depends(get_db)):
         "message": "위키가 추가되었습니다."
     })
 
+@app.get("/wiki/{wiki_id}/edit", response_class=HTMLResponse)
+async def wiki_edit_form(wiki_id: int, request: Request, db: Session = Depends(get_db)):
+    """위키 수정 페이지"""
+    wiki = db.query(Wiki).filter(Wiki.id == wiki_id).first()
+    if not wiki:
+        return HTMLResponse("위키를 찾을 수 없습니다", status_code=404)
+    return templates.TemplateResponse("wiki_manage.html", {
+        "request": request,
+        "wiki_to_edit": wiki,
+        "wikis": [] # 목록은 안 보여줘도 됨
+    })
+
+@app.post("/api/wiki/{wiki_id}/edit")
+async def wiki_edit(wiki_id: int, request: Request, db: Session = Depends(get_db)):
+    """위키 수정 처리"""
+    form = await request.form()
+    wiki = db.query(Wiki).filter(Wiki.id == wiki_id).first()
+    if not wiki:
+        return JSONResponse({"success": False, "error": "위키를 찾을 수 없습니다"})
+    
+    wiki.title = form.get("title")
+    wiki.category = form.get("category")
+    wiki.preview = form.get("preview")
+    wiki.content = form.get("content", "")
+    wiki.type = "manual" # 수동 수정됨
+    
+    db.commit()
+    
+    if ES_ENABLED:
+        try:
+            index_wiki(wiki)
+        except Exception as e:
+            print(f"ES 업데이트 오류: {e}")
+            
+    return JSONResponse({"success": True, "message": "수정되었습니다."})
+
+@app.post("/api/wiki/{wiki_id}/delete")
+async def wiki_delete(wiki_id: int, db: Session = Depends(get_db)):
+    """위키 삭제 처리"""
+    wiki = db.query(Wiki).filter(Wiki.id == wiki_id).first()
+    if not wiki:
+        return JSONResponse({"success": False, "error": "위키를 찾을 수 없습니다"})
+    
+    db.delete(wiki)
+    db.commit()
+    
+    # ES에서도 삭제 (구현되어 있다면)
+    # if ES_ENABLED: es.delete(index="wiki", id=wiki_id)
+    
+    return JSONResponse({"success": True, "message": "삭제되었습니다."})
+
 @app.get("/wiki/manage", response_class=HTMLResponse)
 async def wiki_manage(request: Request, db: Session = Depends(get_db)):
     """위키 관리 페이지"""

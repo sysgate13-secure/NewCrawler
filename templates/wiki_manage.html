@@ -1,35 +1,162 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>위키 관리 - 보안 뉴스 플랫폼</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; color: #333; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .nav-container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 1.8rem; font-weight: bold; }
-        .back-link { color: white; text-decoration: none; padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border-radius: 5px; }
-        .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
-        .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; }
-        h1 { color: #667eea; margin-bottom: 1.5rem; }
-        h2 { color: #333; margin-bottom: 1rem; }
-        .form-group { margin-bottom: 1.5rem; }
-        label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #555; }
-        input, textarea, select { width: 100%; padding: 0.8rem; border: 2px solid #e9ecef; border-radius: 5px; font-size: 1rem; font-family: inherit; }
-        input:focus, textarea:focus, select:focus { outline: none; border-color: #667eea; }
-        textarea { min-height: 150px; resize: vertical; }
-        .btn { padding: 0.8rem 2rem; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; transition: background 0.3s; }
-        .btn:hover { background: #5568d3; }
-        .wiki-list { display: grid; gap: 1rem; }
-        .wiki-item { background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #28a745; }
-        .wiki-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem; color: #28a745; }
-        .wiki-category { background: #28a745; color: white; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.8rem; display: inline-block; margin-bottom: 0.5rem; }
-        .wiki-preview { color: #555; line-height: 1.6; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+
+        .back-link {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 1.5rem;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        .btn {
+            padding: 0.8rem 2rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .wiki-list {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .wiki-item {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+        }
+
+        .wiki-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #28a745;
+        }
+
+        .wiki-category {
+            background: #28a745;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+        }
+
+        .wiki-preview {
+            color: #555;
+            line-height: 1.6;
+        }
     </style>
 </head>
+
 <body>
     <header class="header">
         <div class="nav-container">
@@ -40,83 +167,131 @@
 
     <div class="container">
         <div class="card">
-            <h1>새 위키 문서 추가</h1>
+            <h1>{% if wiki_to_edit %}위키 문서 수정{% else %}새 위키 문서 추가{% endif %}</h1>
             <form id="wikiForm">
                 <div class="form-group">
                     <label for="title">제목</label>
-                    <input type="text" id="title" name="title" required placeholder="예: SQL 인젝션 공격과 방어">
+                    <input type="text" id="title" name="title" required placeholder="예: SQL 인젝션 공격과 방어"
+                        value="{{ wiki_to_edit.title if wiki_to_edit else '' }}">
                 </div>
-                
+
                 <div class="form-group">
                     <label for="category">카테고리</label>
-                    <input type="text" id="category" name="category" required placeholder="예: 웹 보안">
+                    <input type="text" id="category" name="category" required placeholder="예: 웹 보안"
+                        value="{{ wiki_to_edit.category if wiki_to_edit else '' }}">
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="type">타입</label>
+                    <label for="type">타입 (현재: {{ wiki_to_edit.type if wiki_to_edit else '신규' }})</label>
                     <select id="type" name="type" required>
-                        <option value="">선택</option>
-                        <option value="web">웹 보안</option>
-                        <option value="network">네트워크 보안</option>
-                        <option value="crypto">암호학</option>
-                        <option value="malware">악성코드</option>
-                        <option value="trend">최신 트렌드</option>
+                        <option value="manual" selected>수동(직접 작성)</option>
+                        <option value="auto" {% if wiki_to_edit and wiki_to_edit.type=='auto' %}selected{% endif %}>
+                            자동(크롤링)</option>
                     </select>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="preview">미리보기 (짧은 설명)</label>
-                    <textarea id="preview" name="preview" required placeholder="이 문서의 간단한 요약을 작성하세요"></textarea>
+                    <textarea id="preview" name="preview" required
+                        placeholder="이 문서의 간단한 요약을 작성하세요">{{ wiki_to_edit.preview if wiki_to_edit else '' }}</textarea>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="content">내용 (Markdown 지원)</label>
-                    <textarea id="content" name="content" style="min-height: 300px;" placeholder="상세한 내용을 작성하세요"></textarea>
+                    <textarea id="content" name="content" style="min-height: 400px;"
+                        placeholder="상세한 내용을 작성하세요">{{ wiki_to_edit.content if wiki_to_edit else '' }}</textarea>
                 </div>
-                
-                <button type="submit" class="btn">📝 위키 추가</button>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn">{% if wiki_to_edit %}💾 수정사항 저장{% else %}📝 위키 추가{% endif
+                        %}</button>
+                    {% if wiki_to_edit %}
+                    <a href="/wiki/manage" class="btn"
+                        style="background: #6c757d; text-decoration: none; display: inline-block;">취소</a>
+                    {% endif %}
+                </div>
             </form>
         </div>
 
+        {% if not wiki_to_edit %}
         <div class="card">
             <h2>기존 위키 목록 ({{ wikis|length }}개)</h2>
             <div class="wiki-list">
                 {% for wiki in wikis %}
-                <div class="wiki-item">
-                    <div class="wiki-category">{{ wiki.category }}</div>
-                    <h3 class="wiki-title">{{ wiki.title }}</h3>
-                    <p class="wiki-preview">{{ wiki.preview }}</p>
-                    <small style="color: #999;">작성일: {{ wiki.created_at.strftime('%Y-%m-%d') }}</small>
+                <div class="wiki-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <div class="wiki-category">{{ wiki.category }}</div>
+                        <h3 class="wiki-title">{{ wiki.title }}</h3>
+                        <p class="wiki-preview"
+                            style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            {{ wiki.preview }}</p>
+                        <small style="color: #999;">{% if wiki.type == 'auto' %}🤖 자동 생성{% else %}👤 수동 작성{% endif %} |
+                            작성일: {{ wiki.created_at.strftime('%Y-%m-%d') }}</small>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-left: 20px;">
+                        <a href="/wiki/{{ wiki.id }}/edit" class="btn"
+                            style="padding: 0.5rem 1rem; background: #ffc107; color: #212529;">수정</a>
+                        <button onclick="deleteWiki({{ wiki.id }})" class="btn"
+                            style="padding: 0.5rem 1rem; background: #dc3545;">삭제</button>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
         </div>
+        {% endif %}
+    </div>
+
+    <div id="wiki-metadata" data-is-edit="{{ 'true' if wiki_to_edit else 'false' }}"
+        data-wiki-id="{{ wiki_to_edit.id if wiki_to_edit else '' }}">
     </div>
 
     <script>
+        const meta = document.getElementById('wiki-metadata');
+        const isEdit = meta.getAttribute('data-is-edit') === 'true';
+        const wikiId = meta.getAttribute('data-wiki-id');
+
         document.getElementById('wikiForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const formData = new FormData(e.target);
-            
+            const url = isEdit ? `/api/wiki/${wikiId}/edit` : '/api/wiki/add';
+
             try {
-                const response = await fetch('/api/wiki/add', {
+                const response = await fetch(url, {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const data = await response.json();
-                
                 if (data.success) {
                     alert('✅ ' + data.message);
-                    location.reload();
+                    location.href = '/wiki/manage';
                 } else {
-                    alert('❌ 추가 실패');
+                    alert('❌ 실패: ' + (data.error || '알 수 없는 오류'));
                 }
             } catch (error) {
                 alert('❌ 오류: ' + error.message);
             }
         });
+
+        async function deleteWiki(id) {
+            if (!confirm('정말로 삭제하시겠습니까?')) return;
+
+            try {
+                const response = await fetch(`/api/wiki/${id}/delete`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('✨ 삭제되었습니다.');
+                    location.reload();
+                } else {
+                    alert('❌ 삭제 실패');
+                }
+            } catch (error) {
+                alert('❌ 오류: ' + error.message);
+            }
+        }
     </script>
 </body>
+
 </html>
