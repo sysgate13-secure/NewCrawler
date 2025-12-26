@@ -17,9 +17,11 @@ from fastapi.staticfiles import StaticFiles
 try:
     from app.elasticsearch_client import create_indices, index_news, index_wiki, search_all, get_es_client
     from app.ai_summarizer import summarize_news
-    ES_ENABLED = True
+    # 기본적으로 켜져 있으나 USE_ELASTICSEARCH=false 설정 시 비활성화
+    ES_ENABLED = os.getenv("USE_ELASTICSEARCH", "true").lower() == "true"
 except Exception as e:
-    print(f"[WARNING] Elasticsearch/AI disabled: {e}")
+    if os.getenv("USE_ELASTICSEARCH", "true").lower() == "true":
+        print(f"[WARNING] Elasticsearch/AI components load failed: {e}")
     ES_ENABLED = False
 
 # DB 테이블 생성
@@ -51,7 +53,7 @@ async def startup_event():
                 create_indices()
                 print("✅ Elasticsearch 인덱스 준비 완료")
             except Exception as e:
-                print(f"⚠️ Elasticsearch 초기화 실패 (서버는 계속 실행됨): {e}")
+                print(f"ℹ️ Elasticsearch가 실행 중이지 않아 검색 엔진 기능이 비활성화되었습니다. (SQLite는 정상 작동함)")
         
         # 메인 루프를 방해하지 않도록 별도 스레드에서 실행
         threading.Thread(target=init_es, daemon=True).start()
