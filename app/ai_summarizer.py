@@ -47,25 +47,25 @@ def summarize_news(title, content=None):
         return ""
 
 def generate_wiki_content(title, category):
-    """LM Studio를 사용하여 위키 상세 내용 생성"""
+    """LM Studio를 사용하여 지식 사전(Wiki) 상세 내용 생성"""
     try:
-        prompt = f"""보안 주제 '{title}'에 대해 지식 사전용 콘텐츠를 작성해줘.
+        prompt = f"""보안 주제 '{title}'에 대해 지식 사전용 콘텐츠를 전문적이고 상세하게 작성해줘.
 카테고리: {category}
 
-다음 형식에 맞춰 전문적으로 작성해줘:
-1. 개념 설명: 이 기술이나 위협의 핵심 정의
-2. 위험성: 보안 측면에서 발생하는 주요 문제점
-3. 대응 방법: 실무자가 적용할 수 있는 방어 대책
+다음 세 가지 섹션을 반드시 포함하여 작성할 것:
+1. 기술 설명 (Short Explanation): 이 기술이나 개념의 핵심 정의와 배경을 2-3문장으로 설명.
+2. 공격 방식 (Attack Methods): 이와 관련된 공격 방식, 취약점 활용 시나리오 또는 위협 요소를 상세히 설명.
+3. 방어 및 보안 (Defense & Security): 실무자가 적용해야 할 구체적인 방어 조치, 보안 설정 또는 대응 전략.
 
-각 섹션은 2문장 내외로 명확하게 작성할 것."""
+각 섹션은 명확한 제목과 함께 매끄러운 한국어 문장으로 작성할 것."""
 
         payload = {
             "model": "local-model",
             "messages": [
-                {"role": "system", "content": "당신은 보안 지식 사전을 집필하는 전문가입니다."},
+                {"role": "system", "content": "당신은 보안 지식 사전을 집필하는 시니어 보안 아키텍트입니다."},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 800,
+            "max_tokens": 1000,
             "temperature": 0.5
         }
         

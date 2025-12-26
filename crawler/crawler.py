@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models import News, Wiki
+from app.ai_summarizer import summarize_news, generate_wiki_content
 import time
 import re
 
@@ -183,23 +184,29 @@ def crawl_boannews(db: Session):
                     print(f"요약 추출 오류({title[:30]}...): {e}")
                     summary = ""
 
-                # 추출한 요약을 3-5줄로 자동 요약
-                if summary and len(summary) > 50:
-                    summary = summarize_text(summary)
+                # 카테고리 분류: 중앙 정의된 규칙 사용
+                category = determine_category(title + ' ' + (summary or ''))
 
                 # 중복 체크
                 existing = db.query(News).filter(News.url == link).first()
                 if existing:
                     continue
-                
-                # 카테고리 분류: 중앙 정의된 규칙 사용
-                category = determine_category(title + ' ' + (summary or ''))
+
+                # AI 요약 시도
+                ai_summary = summarize_news(title, summary)
+                if ai_summary:
+                    processed_summary = ai_summary
+                elif summary and len(summary) > 50:
+                    # AI 실패 시 기존 텍스트 기반 요약
+                    processed_summary = summarize_text(summary)
+                else:
+                    processed_summary = summary or ""
 
                 news = News(
                     title=title,
                     source="보안뉴스",
                     date=datetime.now().strftime("%Y-%m-%d"),
-                    summary=summary or "",
+                    summary=processed_summary,
                     category=category,
                     url=link
                 )
@@ -212,12 +219,18 @@ def crawl_boannews(db: Session):
 
                 wiki_existing = db.query(Wiki).filter(Wiki.title == title).first()
                 if not wiki_existing:
-                    wiki_preview = (summary[:200] + '...') if summary and len(summary) > 200 else (summary or '')
-                    wiki_content = f"출처: 보안뉴스\n원문: {link}\n\n요약:\n{(summary or '요약이 없습니다.')}\n\n설명: 이 항목은 자동으로 생성된 위키입니다. 필요하면 편집해 주세요."
+                    # AI 위키 콘텐츠 생성
+                    wiki_cat = CATEGORY_LABELS.get(category, category or '기타')
+                    wiki_content = generate_wiki_content(title, wiki_cat)
+                    
+                    if not wiki_content:
+                        # AI 실패 시 폴백
+                        wiki_content = f"출처: 보안뉴스\n원문: {link}\n\n요약:\n{(processed_summary or '요약 없음')}"
+                    
                     wiki = Wiki(
                         title=title,
-                        category=CATEGORY_LABELS.get(category, category or '보안뉴스'),
-                        preview=wiki_preview,
+                        category=wiki_cat,
+                        preview=(processed_summary[:200] + '...') if processed_summary and len(processed_summary) > 200 else (processed_summary or ''),
                         content=wiki_content,
                         type="auto"
                     )
@@ -526,9 +539,16 @@ def _generic_crawl(db: Session, list_url: str, domain: str, source_label: str,
                 existing = db.query(News).filter(News.url == link).first()
                 if existing: continue
 
+                # AI 요약 시도
+                ai_summary = summarize_news(title, summary)
+                if ai_summary:
+                    processed_summary = ai_summary
+                else:
+                    processed_summary = summarize_text(summary) if summary else ""
+
                 news = News(
                     title=title, source=source_label, date=datetime.now().strftime("%Y-%m-%d"),
-                    summary=summarize_text(summary) if summary else "",
+                    summary=processed_summary,
                     category=category, url=link
                 )
                 db.add(news)
@@ -537,10 +557,16 @@ def _generic_crawl(db: Session, list_url: str, domain: str, source_label: str,
                 # 위키 자동 생성
                 wiki_existing = db.query(Wiki).filter(Wiki.title == title).first()
                 if not wiki_existing:
+                    wiki_cat = CATEGORY_LABELS.get(category, '기타')
+                    wiki_content = generate_wiki_content(title, wiki_cat)
+                    
+                    if not wiki_content:
+                        wiki_content = f"출처: {source_label}\n원문: {link}\n\n요약:\n{processed_summary or '요약 없음'}"
+                        
                     wiki = Wiki(
-                        title=title, category=CATEGORY_LABELS.get(category, '기타'),
-                        preview=(summary[:200] + '...') if summary and len(summary) > 200 else (summary or ''),
-                        content=f"출처: {source_label}\n원문: {link}\n\n요약:\n{summary or '요약 없음'}",
+                        title=title, category=wiki_cat,
+                        preview=(processed_summary[:200] + '...') if processed_summary and len(processed_summary) > 200 else (processed_summary or ''),
+                        content=wiki_content,
                         type="auto"
                     )
                     db.add(wiki)
