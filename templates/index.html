@@ -62,7 +62,7 @@
                             <a href="{{ news.url }}" target="_blank">{{ news.title }}</a>
                         </h3>
                         {% if news.summary %}
-                        <p class="news-summary">{{ news.summary }}</p>
+                        <p class="news-summary">{{ news.summary | clean_summary }}</p>
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -75,11 +75,12 @@
                 </div>
                 <div id="wikiGrid" class="wiki-grid">
                     {% for wiki in wiki_list %}
-                    <div class="wiki-card">
+                    <div class="wiki-card" onclick="location.href='/wiki/{{ wiki.id }}'">
                         <div class="wiki-category">{{ wiki.category }}</div>
                         <h3 class="wiki-title">{{ wiki.title }}</h3>
+                        <p class="wiki-preview">{{ wiki | wiki_preview('medium') }}</p>
                         {% if wiki.tags %}
-                        <div style="margin:6px 0 0 0;">
+                        <div style="margin:10px 0 0 0;">
                             {% for t in (wiki.tags.split(',') if wiki.tags else []) %}
                             <span style="display:inline-block;background:#eef2ff;color:#3730a3;padding:0.2rem 0.5rem;border-radius:8px;margin-right:6px;font-size:0.8rem;">#{{ t }}</span>
                             {% endfor %}
