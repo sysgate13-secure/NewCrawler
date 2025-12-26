@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 
 <head>
@@ -131,6 +131,7 @@
             padding: 1.5rem;
             border-radius: 8px;
             border-left: 4px solid #28a745;
+            margin-bottom: 20px;
         }
 
         .wiki-title {
@@ -153,6 +154,11 @@
         .wiki-preview {
             color: #555;
             line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -164,7 +170,6 @@
             <a href="/" class="back-link">← 메인으로</a>
         </div>
     </header>
-
     <div class="container">
         <div class="card">
             <h1>{% if wiki_to_edit %}위키 문서 수정{% else %}새 위키 문서 추가{% endif %}</h1>
@@ -174,13 +179,11 @@
                     <input type="text" id="title" name="title" required placeholder="예: SQL 인젝션 공격과 방어"
                         value="{{ wiki_to_edit.title if wiki_to_edit else '' }}">
                 </div>
-
                 <div class="form-group">
                     <label for="category">카테고리</label>
                     <input type="text" id="category" name="category" required placeholder="예: 웹 보안"
                         value="{{ wiki_to_edit.category if wiki_to_edit else '' }}">
                 </div>
-
                 <div class="form-group">
                     <label for="type">타입 (현재: {{ wiki_to_edit.type if wiki_to_edit else '신규' }})</label>
                     <select id="type" name="type" required>
@@ -189,30 +192,24 @@
                             자동(크롤링)</option>
                     </select>
                 </div>
-
                 <div class="form-group">
                     <label for="preview">미리보기 (짧은 설명)</label>
                     <textarea id="preview" name="preview" required
                         placeholder="이 문서의 간단한 요약을 작성하세요">{{ wiki_to_edit.preview if wiki_to_edit else '' }}</textarea>
                 </div>
-
                 <div class="form-group">
                     <label for="content">내용 (Markdown 지원)</label>
                     <textarea id="content" name="content" style="min-height: 400px;"
                         placeholder="상세한 내용을 작성하세요">{{ wiki_to_edit.content if wiki_to_edit else '' }}</textarea>
                 </div>
-
                 <div style="display: flex; gap: 10px;">
                     <button type="submit" class="btn">{% if wiki_to_edit %}💾 수정사항 저장{% else %}📝 위키 추가{% endif
                         %}</button>
-                    {% if wiki_to_edit %}
-                    <a href="/wiki/manage" class="btn"
-                        style="background: #6c757d; text-decoration: none; display: inline-block;">취소</a>
-                    {% endif %}
+                    {% if wiki_to_edit %}<a href="/wiki/manage" class="btn"
+                        style="background: #6c757d; text-decoration: none; display: inline-block;">취소</a>{% endif %}
                 </div>
             </form>
         </div>
-
         {% if not wiki_to_edit %}
         <div class="card">
             <h2>기존 위키 목록 ({{ wikis|length }}개)</h2>
@@ -220,19 +217,19 @@
                 {% for wiki in wikis %}
                 <div class="wiki-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
-                        <div class="wiki-category">{{ wiki.category }}</div>
+                        <span class="wiki-category">{{ wiki.category }}</span>
                         <h3 class="wiki-title">{{ wiki.title }}</h3>
-                        <p class="wiki-preview"
-                            style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                            {{ wiki.preview }}</p>
-                        <small style="color: #999;">{% if wiki.type == 'auto' %}🤖 자동 생성{% else %}👤 수동 작성{% endif %} |
-                            작성일: {{ wiki.created_at.strftime('%Y-%m-%d') }}</small>
+                        <p class="wiki-preview">{{ wiki.preview }}</p>
+                        <small style="color: #999; margin-top: 0.5rem; display: block;">
+                            {% if wiki.type == 'auto' %}자동 생성{% else %}수동 작성{% endif %} | 등록일: {{
+                            wiki.created_at|format_date }}
+                        </small>
                     </div>
-                    <div style="display: flex; gap: 10px; margin-left: 20px;">
+                    <div style="display: flex; gap: 10px; margin-left: 20px; flex-shrink: 0;">
                         <a href="/wiki/{{ wiki.id }}/edit" class="btn"
-                            style="padding: 0.5rem 1rem; background: #ffc107; color: #212529;">수정</a>
-                        <button onclick="deleteWiki({{ wiki.id }})" class="btn"
-                            style="padding: 0.5rem 1rem; background: #dc3545;">삭제</button>
+                            style="padding: 0.5rem 1rem; background: #ffc107; color: #212529; text-decoration: none; font-size: 0.9rem;">수정</a>
+                        <button class="btn btn-delete" data-id="{{ wiki.id }}"
+                            style="padding: 0.5rem 1rem; background: #dc3545; font-size: 0.9rem;">삭제</button>
                     </div>
                 </div>
                 {% endfor %}
@@ -240,57 +237,36 @@
         </div>
         {% endif %}
     </div>
-
     <div id="wiki-metadata" data-is-edit="{{ 'true' if wiki_to_edit else 'false' }}"
-        data-wiki-id="{{ wiki_to_edit.id if wiki_to_edit else '' }}">
-    </div>
-
+        data-wiki-id="{{ wiki_to_edit.id if wiki_to_edit else '' }}"></div>
     <script>
         const meta = document.getElementById('wiki-metadata');
         const isEdit = meta.getAttribute('data-is-edit') === 'true';
         const wikiId = meta.getAttribute('data-wiki-id');
-
         document.getElementById('wikiForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const url = isEdit ? `/api/wiki/${wikiId}/edit` : '/api/wiki/add';
-
             try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData
-                });
-
+                const response = await fetch(url, { method: 'POST', body: formData });
                 const data = await response.json();
-                if (data.success) {
-                    alert('✅ ' + data.message);
-                    location.href = '/wiki/manage';
-                } else {
-                    alert('❌ 실패: ' + (data.error || '알 수 없는 오류'));
-                }
-            } catch (error) {
-                alert('❌ 오류: ' + error.message);
-            }
+                if (data.success) { alert('✅ ' + data.message); location.href = '/wiki/manage'; }
+                else { alert('❌ 실패: ' + (data.error || '알 수 없는 오류')); }
+            } catch (error) { alert('❌ 오류: ' + error.message); }
         });
-
-        async function deleteWiki(id) {
-            if (!confirm('정말로 삭제하시겠습니까?')) return;
-
-            try {
-                const response = await fetch(`/api/wiki/${id}/delete`, {
-                    method: 'POST'
-                });
-                const data = await response.json();
-                if (data.success) {
-                    alert('✨ 삭제되었습니다.');
-                    location.reload();
-                } else {
-                    alert('❌ 삭제 실패');
+        document.querySelectorAll('.btn-delete').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                if (confirm('정말로 삭제하시겠습니까?')) {
+                    fetch(`/api/wiki/${id}/delete`, { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) { alert('✨ 삭제되었습니다.'); location.reload(); }
+                            else { alert('❌ 삭제 실패'); }
+                        }).catch(err => alert('❌ 오류: ' + err.message));
                 }
-            } catch (error) {
-                alert('❌ 오류: ' + error.message);
-            }
-        }
+            });
+        });
     </script>
 </body>
 

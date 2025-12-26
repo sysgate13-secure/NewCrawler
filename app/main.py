@@ -37,6 +37,7 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 # Jinja2 커스텀 필터 등록
 templates.env.filters['wiki_preview'] = lambda wiki, mode='short': get_wiki_preview(wiki, mode)
 templates.env.filters['clean_summary'] = clean_news_summary
+templates.env.filters['format_date'] = lambda dt: dt.strftime('%Y-%m-%d') if hasattr(dt, 'strftime') else str(dt)[:10] if dt else 'N/A'
 
 # 정적 파일 설정
 static_path = os.path.join(BASE_DIR, "static")

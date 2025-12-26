@@ -21,7 +21,8 @@ def summarize_news(title, content=None):
 1. 반드시 한국어로 작성할 것. (한자 실수를 방지하기 위해 '勒'과 같은 한자 대신 '랜섬웨어'라고 작성)
 2. '누가, 어떤 취약점으로, 어떤 피해를 입었는지'를 포함할 것.
 3. 전문 용어는 가급적 유지하되 문장은 매끄럽게 '~함', '~임' 체로 끝낼 것.
-4. 최대 2문장으로 압축할 것."""
+4. **절대 한자(Chinese characters)를 사용하지 말 것.** (예: '勒'(랜섬), '蜘蛛'(크롤러/스파이더), '歌曲'(음악/곡) 등 금지)
+5. 최대 2문장으로 압축할 것."""
 
         payload = {
             "model": "local-model",
@@ -66,7 +67,7 @@ def generate_wiki_content(title, category):
         payload = {
             "model": "local-model",
             "messages": [
-                {"role": "system", "content": "당신은 보안 지식 사전을 집필하는 시니어 보안 아키텍트입니다."},
+                {"role": "system", "content": "당신은 보안 지식 사전을 집필하는 시니어 보안 아키텍트입니다. 모든 답변은 한자(Chinese characters) 없이 순수 한국어로만 작성해야 합니다. 한자어는 한자를 쓰지 말고 한글로만 표기하십시오."},
                 {"role": "user", "content": prompt}
             ],
             "max_tokens": 1000,
