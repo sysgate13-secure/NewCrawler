@@ -106,16 +106,34 @@
                     </div>
                 </div>
 
-                <!-- 크롤링 상태 섹션 -->
-                <div class="dashboard-section-title">최근 크롤링 실행</div>
-                <div id="crawl-status" class="crawl-status-card">
-                    <div class="status-loading">로드 중...</div>
+                <!-- 크롤링 소스 정보 -->
+                <div class="dashboard-section-title">크롤링 소스</div>
+                <div class="crawl-sources">
+                    <div class="source-card">
+                        <h4>🇰🇷 국내 소스</h4>
+                        <ul>
+                            <li><strong>보안뉴스</strong> - www.boannews.com</li>
+                            <li><strong>KrCERT</strong> - 한국인터넷진흥원 보안공지</li>
+                            <li><strong>ZDNet Korea</strong> - 보안 뉴스 섹션</li>
+                        </ul>
+                    </div>
+                    <div class="source-card">
+                        <h4>🌍 해외 소스</h4>
+                        <ul>
+                            <li><strong>The Hacker News</strong> - thehackernews.com</li>
+                            <li><strong>KrebsOnSecurity</strong> - krebsonsecurity.com</li>
+                            <li><strong>BleepingComputer</strong> - bleepingcomputer.com</li>
+                            <li><strong>SecurityWeek</strong> - securityweek.com</li>
+                            <li><strong>DarkReading</strong> - darkreading.com</li>
+                            <li><strong>CISA</strong> - 미국 사이버보안청</li>
+                        </ul>
+                    </div>
                 </div>
 
-                <!-- 크롤링 히스토리 -->
-                <div class="dashboard-section-title">크롤링 히스토리</div>
-                <div id="crawl-history" class="crawl-history">
-                    <div class="history-loading">로드 중...</div>
+                <!-- 소스별 통계 -->
+                <div class="dashboard-section-title">소스별 뉴스 수</div>
+                <div id="source-stats" class="source-stats">
+                    <div class="stats-loading">로드 중...</div>
                 </div>
 
                 <!-- 카테고리별 통계 -->
@@ -463,19 +481,10 @@
                 statsEl.innerHTML = '';
                 stats.forEach(stat => {
                     const el = document.createElement('div');
-                    el.className = 'category-stat-item';
+                    el.className = 'source-stat-item';
                     el.innerHTML = `
-                        <div class="stat-category-name">${stat.category || '미분류'}</div>
-                        <div class="stat-category-values">
-                            <div class="stat-item-small">
-                                <span class="stat-item-label">뉴스</span>
-                                <span class="stat-item-value">${stat.news_count || 0}</span>
-                            </div>
-                            <div class="stat-item-small">
-                                <span class="stat-item-label">지식</span>
-                                <span class="stat-item-value">${stat.wiki_count || 0}</span>
-                            </div>
-                        </div>
+                        <span class="source-name">${stat.label}</span>
+                        <span class="source-count">${stat.count}</span>
                     `;
                     statsEl.appendChild(el);
                 });
@@ -487,11 +496,51 @@
         // 페이지 로드 시 대시보드 데이터 로드
         window.addEventListener('load', () => {
             if (currentSection === 'dashboard') {
-                loadCrawlStatus();
-                loadCrawlHistory();
+                loadSourceStats();
                 loadCategoryStats();
             }
         });
+
+        // 소스별 통계 로드
+        async function loadSourceStats() {
+            try {
+                const response = await fetch('/api/stats/sources');
+                const stats = await response.json();
+                
+                const statsEl = document.getElementById('source-stats');
+                if (!stats || stats.length === 0) {
+                    statsEl.innerHTML = '<p style="text-align: center; color: #999;">통계 데이터가 없습니다.</p>';
+                    return;
+                }
+
+                statsEl.innerHTML = '';
+                stats.forEach(stat => {
+                    const el = document.createElement('div');
+                    el.className = 'source-stat-item';
+                    el.innerHTML = `
+                        <span class="source-name">${stat.source}</span>
+                        <span class="source-count">${stat.count}</span>
+                    `;
+                    statsEl.appendChild(el);
+                });
+            } catch (error) {
+                console.error('소스 통계 로드 오류:', error);
+            }
+        }
+
+        // 섹션 전환 시 대시보드 데이터 로드
+        function switchSection(section) {
+            document.getElementById('news-section').style.display = 'none';
+            document.getElementById('wiki-section').style.display = 'none';
+            document.getElementById('dashboard-section').style.display = 'none';
+            document.getElementById(section + '-section').style.display = 'block';
+            currentSection = section;
+            
+            if (section === 'dashboard') {
+                loadSourceStats();
+                loadCategoryStats();
+            }
+        }
     </script>
 </body>
 </html>

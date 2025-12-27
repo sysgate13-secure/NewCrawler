@@ -602,43 +602,40 @@ def crawl_infosecurity(db: Session):
 def crawl_all(db: Session):
     """모든 소스 크롤링"""
     start_time = datetime.now()
-    print(f"\n[🚀] {start_time.strftime('%Y-%m-%d %H:%M:%S')} - 크롤링을 시작합니다. 잠시만 기다려 주세요...")
+    print(f"\n[🚀] {start_time.strftime('%Y-%m-%d %H:%M:%S')} - 크롤링을 시작합니다.")
     print("==================================================")
     
     total = 0
 
-    print("\n[1] 국내 보안뉴스 수집 중...")
+    print("\n[1/2] 국내 보안뉴스 수집 중...")
     res = crawl_boannews(db)
-    if res != -1: total += res
+    if res != -1: 
+        total += res
+        print(f"   ✅ {res}개 수집 완료")
+    else:
+        print("   ❌ 수집 실패")
     time.sleep(1)
 
-    # 새로운 해외 보안 뉴스 소스
-    overseas = [
-        (crawl_cyberscoop, 'CyberScoop'),
-        (crawl_helpnetsecurity, 'HelpNetSecurity'),
-        (crawl_hackread, 'HackRead'),
-        (crawl_infosecurity, 'InfoSecurity Magazine'),
-    ]
-
-    idx = 2
-    for func, name in overseas:
-        print(f"\n[{idx}] {name} 해외 소스 수집 중...")
-        try:
-            r = func(db)
-            if r != -1: total += r
-            time.sleep(1)
-        except Exception as e:
-            print(f"❌ {name} 오류: {e}")
-        idx += 1
+    print("\n[2/2] HackRead 수집 중...")
+    try:
+        r = crawl_hackread(db)
+        if r != -1: 
+            total += r
+            print(f"   ✅ {r}개 수집 완료")
+        else:
+            print("   ❌ 수집 실패")
+        time.sleep(1)
+    except Exception as e:
+        print(f"   ❌ HackRead 오류: {e}")
 
     end_time = datetime.now()
     duration = end_time - start_time
     minutes, seconds = divmod(duration.seconds, 60)
     
     print("\n==================================================")
-    print(f"[✅] {end_time.strftime('%Y-%m-%d %H:%M:%S')} - 크롤링 마무리함.")
+    print(f"[✅] {end_time.strftime('%Y-%m-%d %H:%M:%S')} - 크롤링 완료")
     print(f"[⏱️] 총 소요 시간: {minutes}분 {seconds}초")
-    print(f"[📊] 새로 추가된 항목: 총 {total}개")
+    print(f"[📊] 새로 추가된 뉴스: 총 {total}개")
     print("==================================================\n")
     return total
 

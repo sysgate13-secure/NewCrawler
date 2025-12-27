@@ -162,7 +162,7 @@ async def search(q: str, db: Session = Depends(get_db)):
             results = search_all(q)
             return results
         except Exception as e:
-            print(f"ES 검색 오류: {e}")
+            pass  # ES 비활성화 시 조용히 무시
     
     # Fallback: SQLite 검색
     news = db.query(News).filter(
@@ -198,7 +198,7 @@ async def add_wiki(request: Request, db: Session = Depends(get_db)):
         try:
             index_wiki(wiki)
         except Exception as e:
-            print(f"ES 인덱싱 오류: {e}")
+            pass  # ES 비활성화 시 조용히 무시
     
     return JSONResponse({
         "success": True, 
@@ -238,7 +238,7 @@ async def wiki_edit(wiki_id: int, request: Request, db: Session = Depends(get_db
         try:
             index_wiki(wiki)
         except Exception as e:
-            print(f"ES 업데이트 오류: {e}")
+            pass  # ES 비활성화 시 조용히 무시
             
     return JSONResponse({"success": True, "message": "수정되었습니다."})
 
@@ -312,3 +312,42 @@ async def health_check():
         "status": "ok",
         "elasticsearch": es_status
     }
+@app.get("/api/stats/sources")
+async def get_source_stats(db: Session = Depends(get_db)):
+    """소스별 뉴스 통계"""
+    from sqlalchemy import func
+    
+    stats = db.query(
+        News.source,
+        func.count(News.id).label('count')
+    ).group_by(News.source).order_by(func.count(News.id).desc()).all()
+    
+    return [{"source": s.source, "count": s.count} for s in stats]
+
+@app.get("/api/stats/categories")
+async def get_category_stats(db: Session = Depends(get_db)):
+    """카테고리별 뉴스 통계"""
+    from sqlalchemy import func
+    
+    stats = db.query(
+        News.category,
+        func.count(News.id).label('count')
+    ).group_by(News.category).order_by(func.count(News.id).desc()).all()
+    
+    category_labels = {
+        'malware': '악성코드',
+        'vulnerability': '취약점',
+        'network': '네트워크',
+        'web': '웹 보안',
+        'crypto': '암호학',
+        'trend': '기타'
+    }
+    
+    return [
+        {
+            "category": s.category,
+            "label": category_labels.get(s.category, s.category),
+            "count": s.count
+        } 
+        for s in stats
+    ]
