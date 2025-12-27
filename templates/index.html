@@ -52,11 +52,19 @@
                     {% for news in news_list %}
                     <div class="news-item">
                         <div class="news-meta">
-                            <div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                 <span class="news-category">{{ category_labels.get(news.category, news.category) }}</span>
-                                <span class="news-source">{{ news.source }}</span>
+                                {% if '보안뉴스' in news.source %}
+                                <span class="news-source" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                                    🇰🇷 {{ news.source }}
+                                </span>
+                                {% else %}
+                                <span class="news-source" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                                    🌍 {{ news.source }}
+                                </span>
+                                {% endif %}
                             </div>
-                            <span>{{ news.date }}</span>
+                            <span style="color: #999; font-size: 0.85rem;">{{ news.date }}</span>
                         </div>
                         <h3 class="news-title">
                             <a href="{{ news.url }}" target="_blank">{{ news.title }}</a>
@@ -64,6 +72,21 @@
                         {% if news.summary %}
                         <p class="news-summary">{{ news.summary | clean_summary }}</p>
                         {% endif %}
+                        <div style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="font-size: 0.8rem; color: #6c757d;">
+                                📰 출처: 
+                                {% if '보안뉴스' in news.source %}
+                                <a href="https://www.boannews.com" target="_blank" style="color: #667eea; text-decoration: none;">www.boannews.com</a>
+                                {% elif 'HackRead' in news.source %}
+                                <a href="https://www.hackread.com" target="_blank" style="color: #f093fb; text-decoration: none;">www.hackread.com</a>
+                                {% else %}
+                                <span>{{ news.source }}</span>
+                                {% endif %}
+                            </div>
+                            <a href="{{ news.url }}" target="_blank" style="color: #667eea; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
+                                원문 보기 →
+                            </a>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -76,7 +99,22 @@
                 <div id="wikiGrid" class="wiki-grid">
                     {% for wiki in wiki_list %}
                     <div class="wiki-card" onclick="location.href='/wiki/{{ wiki.id }}'">
-                        <div class="wiki-category">{{ wiki.category }}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <div class="wiki-category">{{ wiki.category }}</div>
+                            {% if wiki.type == 'auto' %}
+                            <span style="background: #e3f2fd; color: #1976d2; padding: 0.2rem 0.6rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">
+                                🤖 자동수집
+                            </span>
+                            {% elif wiki.type == 'manual' %}
+                            <span style="background: #f3e5f5; color: #7b1fa2; padding: 0.2rem 0.6rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">
+                                ✍️ 수동작성
+                            </span>
+                            {% else %}
+                            <span style="background: #e8f5e9; color: #388e3c; padding: 0.2rem 0.6rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">
+                                📚 전문문서
+                            </span>
+                            {% endif %}
+                        </div>
                         <h3 class="wiki-title">{{ wiki.title }}</h3>
                         <p class="wiki-preview">{{ wiki | wiki_preview('medium') }}</p>
                         {% if wiki.tags %}

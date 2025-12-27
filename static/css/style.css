@@ -299,3 +299,57 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-
     padding-bottom: 0.5rem;
     border-bottom: 2px solid #667eea;
 }
+
+/* 뉴스 카테고리 뱃지 */
+.news-category {
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.3rem 0.8rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* 뉴스 소스 뱃지 개선 */
+.news-source {
+    color: white;
+    padding: 0.3rem 0.8rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* 뉴스 아이템 호버 효과 개선 */
+.news-item {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+    transition: all 0.3s ease;
+}
+
+.news-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    border-left-color: #5568d3;
+}
+
+/* 원문 보기 링크 */
+.news-item a[href*="http"]:hover {
+    text-decoration: underline;
+}
+
+/* 위키 타입 뱃지 */
+.wiki-type-badge {
+    padding: 0.3rem 0.8rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}

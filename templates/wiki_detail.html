@@ -162,8 +162,33 @@
 
     <div class="container">
         <div class="card">
-            <div class="wiki-category">{{ wiki.category }}</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div class="wiki-category">{{ wiki.category }}</div>
+                {% if wiki.type == 'auto' %}
+                <span style="background: #e3f2fd; color: #1976d2; padding: 0.3rem 0.8rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600;">
+                    🤖 자동 수집된 문서
+                </span>
+                {% elif wiki.type == 'manual' %}
+                <span style="background: #f3e5f5; color: #7b1fa2; padding: 0.3rem 0.8rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600;">
+                    ✍️ 수동 작성된 문서
+                </span>
+                {% else %}
+                <span style="background: #e8f5e9; color: #388e3c; padding: 0.3rem 0.8rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600;">
+                    📚 전문 보안 지식
+                </span>
+                {% endif %}
+            </div>
             <h1>{{ wiki.title }}</h1>
+            
+            {% if wiki.type == 'auto' %}
+            <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #ffc107;">
+                <p style="margin: 0; color: #856404; font-size: 0.9rem;">
+                    <strong>ℹ️ 자동 수집 정보</strong><br>
+                    이 문서는 크롤링을 통해 자동으로 생성되었습니다. 더 자세한 정보는 원문을 참고하세요.
+                </p>
+            </div>
+            {% endif %}
+            
             <div class="content">
                 {{ wiki.content | safe }}
             </div>
