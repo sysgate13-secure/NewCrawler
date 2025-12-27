@@ -18,9 +18,8 @@
 - **웹 편집**: 브라우저에서 직접 작성
 
 ### 📊 데이터 수집
-- 보안뉴스 (boannews.com)
-- KrCERT 보안공지
-- RSS 피드
+- **보안뉴스** (boannews.com) - 국내 최대 정보보안 전문 미디어
+- **HackRead** (hackread.com) - 해외 사이버 보안 뉴스
 
 ## 🏗️ 기술 스택
 
