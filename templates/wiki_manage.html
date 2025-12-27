@@ -205,8 +205,9 @@
                 <div style="display: flex; gap: 10px;">
                     <button type="submit" class="btn">{% if wiki_to_edit %}💾 수정사항 저장{% else %}📝 위키 추가{% endif
                         %}</button>
-                    {% if wiki_to_edit %}<a href="/wiki/manage" class="btn"
-                        style="background: #6c757d; text-decoration: none; display: inline-block;">취소</a>{% endif %}
+                    {% if wiki_to_edit %}
+                    <button type="button" class="btn btn-cancel" style="background: #6c757d;">취소</button>
+                    {% endif %}
                 </div>
             </form>
         </div>
@@ -250,10 +251,30 @@
             try {
                 const response = await fetch(url, { method: 'POST', body: formData });
                 const data = await response.json();
-                if (data.success) { alert('✅ ' + data.message); location.href = '/wiki/manage'; }
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    // 이전 페이지가 있고, 현재 편집 페이지가 아닌 경우 해당 페이지로 이동
+                    if (document.referrer && !document.referrer.includes('/edit')) {
+                        location.href = document.referrer;
+                    } else {
+                        location.href = isEdit ? `/wiki/${wikiId}` : '/wiki/manage';
+                    }
+                }
                 else { alert('❌ 실패: ' + (data.error || '알 수 없는 오류')); }
             } catch (error) { alert('❌ 오류: ' + error.message); }
         });
+
+        // 취소 버튼 이벤트 리스너 추가 (수정 모드일 때만)
+        const cancelBtn = document.querySelector('.btn-cancel');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                if (document.referrer && !document.referrer.includes('/edit')) {
+                    location.href = document.referrer;
+                } else {
+                    location.href = '/wiki/manage';
+                }
+            });
+        }
         document.querySelectorAll('.btn-delete').forEach(button => {
             button.addEventListener('click', () => {
                 const id = button.getAttribute('data-id');
