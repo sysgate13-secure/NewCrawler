@@ -1,4 +1,5 @@
 import requests
+import bleach
 from bs4 import BeautifulSoup
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -203,10 +204,10 @@ def crawl_boannews(db: Session):
                     processed_summary = summary or ""
 
                 news = News(
-                    title=title,
+                    title=bleach.clean(title),
                     source="보안뉴스",
                     date=datetime.now().strftime("%Y-%m-%d"),
-                    summary=processed_summary,
+                    summary=bleach.clean(processed_summary),
                     category=category,
                     url=link
                 )
@@ -228,10 +229,10 @@ def crawl_boannews(db: Session):
                         wiki_content = f"출처: 보안뉴스\n원문: {link}\n\n요약:\n{(processed_summary or '요약 없음')}"
                     
                     wiki = Wiki(
-                        title=title,
+                        title=bleach.clean(title),
                         category=wiki_cat,
-                        preview=(processed_summary[:200] + '...') if processed_summary and len(processed_summary) > 200 else (processed_summary or ''),
-                        content=wiki_content,
+                        preview=(bleach.clean(processed_summary[:200]) + '...') if processed_summary and len(processed_summary) > 200 else (bleach.clean(processed_summary) or ''),
+                        content=bleach.clean(wiki_content, tags=['p', 'a', 'strong', 'em', 'ul', 'li', 'h1', 'h2', 'h3']),
                         type="auto"
                     )
                     db.add(wiki)
@@ -547,8 +548,8 @@ def _generic_crawl(db: Session, list_url: str, domain: str, source_label: str,
                     processed_summary = summarize_text(summary) if summary else ""
 
                 news = News(
-                    title=title, source=source_label, date=datetime.now().strftime("%Y-%m-%d"),
-                    summary=processed_summary,
+                    title=bleach.clean(title), source=source_label, date=datetime.now().strftime("%Y-%m-%d"),
+                    summary=bleach.clean(processed_summary),
                     category=category, url=link
                 )
                 db.add(news)
@@ -564,9 +565,9 @@ def _generic_crawl(db: Session, list_url: str, domain: str, source_label: str,
                         wiki_content = f"출처: {source_label}\n원문: {link}\n\n요약:\n{processed_summary or '요약 없음'}"
                         
                     wiki = Wiki(
-                        title=title, category=wiki_cat,
-                        preview=(processed_summary[:200] + '...') if processed_summary and len(processed_summary) > 200 else (processed_summary or ''),
-                        content=wiki_content,
+                        title=bleach.clean(title), category=wiki_cat,
+                        preview=(bleach.clean(processed_summary[:200]) + '...') if processed_summary and len(processed_summary) > 200 else (bleach.clean(processed_summary) or ''),
+                        content=bleach.clean(wiki_content, tags=['p', 'a', 'strong', 'em', 'ul', 'li', 'h1', 'h2', 'h3']),
                         type="auto"
                     )
                     db.add(wiki)

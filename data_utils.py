@@ -3,36 +3,13 @@
 위키 콘텐츠에서 핵심 정보만 추출
 """
 import re
+import bleach
 
-def clean_markdown(text):
-    """마크다운 문법 제거"""
+def sanitize_html(text):
+    """HTML 태그 제거"""
     if not text:
         return ""
-    
-    # 코드 블록 제거
-    text = re.sub(r'```[\s\S]*?```', '', text)
-    
-    # 인라인 코드 제거
-    text = re.sub(r'`[^`]+`', '', text)
-    
-    # 헤더 마크 제거 (##, ###)
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-    
-    # 리스트 마크 제거 (-, *, 1.)
-    text = re.sub(r'^[\-\*]\s+', '', text, flags=re.MULTILINE)
-    text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
-    
-    # 볼드/이탤릭 제거
-    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
-    text = re.sub(r'\*([^*]+)\*', r'\1', text)
-    
-    # 링크 제거 [텍스트](url) -> 텍스트
-    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-    
-    # 여러 줄바꿈을 하나로
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    
-    return text.strip()
+    return bleach.clean(text, tags=[], strip=True)
 
 def extract_summary(content, max_sentences=3):
     """첫 N개 문장만 추출"""
@@ -40,7 +17,7 @@ def extract_summary(content, max_sentences=3):
         return ""
     
     # 마크다운 정제
-    clean_text = clean_markdown(content)
+    clean_text = sanitize_html(content)
     
     # 문장 단위로 분리 (., !, ? 기준)
     sentences = re.split(r'[.!?]\s+', clean_text)
@@ -63,7 +40,7 @@ def extract_key_points(content, max_points=5):
     list_items += re.findall(r'^\d+\.\s+(.+)$', content, flags=re.MULTILINE)
     
     # 마크다운 정제
-    clean_items = [clean_markdown(item) for item in list_items]
+    clean_items = [sanitize_html(item) for item in list_items]
     
     # 빈 항목 제거
     clean_items = [item for item in clean_items if item and len(item) > 5]
@@ -94,7 +71,7 @@ def extract_concept(content):
     
     if len(sections) > 1:
         first_section = sections[1].split('\n\n')[0]  # 첫 문단만
-        return clean_markdown(first_section)
+        return sanitize_html(first_section)
     
     
     return extract_summary(content, max_sentences=2)
@@ -144,7 +121,7 @@ def format_for_display(text, remove_technical=False):
     if not text:
         return ""
     
-    text = clean_markdown(text)
+    text = sanitize_html(text)
     
     if remove_technical:
         # 기술적 용어 간소화 (선택적)
@@ -164,7 +141,7 @@ def extract_attack_method(content):
     # "공격 예시", "공격 시나리오" 등의 섹션 찾기
     attack_section = re.search(r'### 공격.*?\n([\s\S]*?)(?=###|\n\n##|$)', content)
     if attack_section:
-        return clean_markdown(attack_section.group(1))
+        return sanitize_html(attack_section.group(1))
     
     return ""
 
@@ -215,8 +192,8 @@ query = f"SELECT * FROM users WHERE id = '{user_id}'"
 
     print("=== 테스트 ===\n")
     
-    print("1. 마크다운 정제:")
-    print(clean_markdown(test_content))
+    print("1. HTML 태그 정제:")
+    print(sanitize_html(test_content))
     print("\n" + "="*50 + "\n")
     
     print("2. 요약 추출 (2문장):")

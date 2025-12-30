@@ -1,3 +1,4 @@
+import bleach
 from fastapi import FastAPI, Depends, Request, BackgroundTasks
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -9,9 +10,7 @@ from crawler.crawler import crawl_all
 from data_utils import get_wiki_preview, get_wiki_highlights, clean_news_summary
 from datetime import datetime
 import os
-from fastapi import FastAPI, Depends, Request, BackgroundTasks
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+
 
 # Elasticsearch와 AI 요약 임포트 (선택적)
 try:
@@ -184,10 +183,10 @@ async def add_wiki(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     
     wiki = Wiki(
-        title=form.get("title"),
+        title=bleach.clean(form.get("title")),
         category=form.get("category"),
-        preview=form.get("preview"),
-        content=form.get("content", ""),
+        preview=bleach.clean(form.get("preview")),
+        content=bleach.clean(form.get("content", ""), tags=['p', 'a', 'strong', 'em', 'ul', 'li', 'h1', 'h2', 'h3']),
         type=form.get("type", "")
     )
     db.add(wiki)
@@ -226,10 +225,10 @@ async def wiki_edit(wiki_id: int, request: Request, db: Session = Depends(get_db
     if not wiki:
         return JSONResponse({"success": False, "error": "위키를 찾을 수 없습니다"})
     
-    wiki.title = form.get("title")
+    wiki.title = bleach.clean(form.get("title"))
     wiki.category = form.get("category")
-    wiki.preview = form.get("preview")
-    wiki.content = form.get("content", "")
+    wiki.preview = bleach.clean(form.get("preview"))
+    wiki.content = bleach.clean(form.get("content", ""), tags=['p', 'a', 'strong', 'em', 'ul', 'li', 'h1', 'h2', 'h3'])
     wiki.type = "manual" # 수동 수정됨
     
     db.commit()

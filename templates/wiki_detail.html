@@ -190,43 +190,11 @@
             {% endif %}
             
             <div class="content">
-                {{ wiki.content | safe }}
+                {{ wiki.content }}
             </div>
         </div>
     </div>
 
-    <script>
-        // Markdown 스타일 콘텐츠를 HTML로 변환 (간단한 변환)
-        document.addEventListener('DOMContentLoaded', function () {
-            const content = document.querySelector('.content');
-            if (content) {
-                let html = content.innerHTML;
-
-                // 코드 블록 처리
-                html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-
-                // 인라인 코드
-                html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-                // 제목
-                html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-                html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-
-                // 리스트
-                html = html.replace(/^\- (.+)$/gm, '<li>$1</li>');
-                html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
-
-                // 리스트 그룹화
-                html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
-
-                // 줄바꿈
-                html = html.replace(/\n\n/g, '</p><p>');
-                html = '<p>' + html + '</p>';
-
-                content.innerHTML = html;
-            }
-        });
-    </script>
 </body>
 
 </html>

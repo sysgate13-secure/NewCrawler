@@ -317,14 +317,80 @@
             wikis.forEach(item => {
                 const el = document.createElement('div');
                 el.className = 'wiki-card';
-                const tagsHtml = (item.tags || '').split(',').filter(t=>t).map(t=>`<span style="display:inline-block;background:#eef2ff;color:#3730a3;padding:0.2rem 0.5rem;border-radius:8px;margin-right:6px;font-size:0.8rem;">#${t}</span>`).join('');
-                el.innerHTML = `
-                    <div class="wiki-category">${item.category || ''}</div>
-                    <h3 class="wiki-title">${item.title}</h3>
-                    ${tagsHtml ? `<div style="margin:6px 0 0 0;">${tagsHtml}</div>` : ''}
-                `;
+                el.onclick = () => location.href = `/wiki/${item.id}`;
+
+                const categoryEl = document.createElement('div');
+                categoryEl.className = 'wiki-category';
+                categoryEl.textContent = item.category || '';
+
+                const titleEl = document.createElement('h3');
+                titleEl.className = 'wiki-title';
+                titleEl.textContent = item.title;
+
+                el.appendChild(categoryEl);
+                el.appendChild(titleEl);
+
+                const tagsHtml = (item.tags || '').split(',').filter(t => t).map(t => `<span style="display:inline-block;background:#eef2ff;color:#3730a3;padding:0.2rem 0.5rem;border-radius:8px;margin-right:6px;font-size:0.8rem;">#${t}</span>`).join('');
+                if (tagsHtml) {
+                    const tagsEl = document.createElement('div');
+                    tagsEl.style.margin = '6px 0 0 0';
+                    tagsEl.innerHTML = tagsHtml;
+                    el.appendChild(tagsEl);
+                }
+                
                 wikiGrid.appendChild(el);
             });
+        }
+
+        function createNewsElement(item) {
+            const newsEl = document.createElement('div');
+            newsEl.className = 'news-item';
+
+            const metaEl = document.createElement('div');
+            metaEl.className = 'news-meta';
+
+            const metaDiv = document.createElement('div');
+            const catLabel = CATEGORY_LABELS[item.category] || item.category || '';
+            const catEmoji = CATEGORY_EMOJI[item.category] || '';
+            
+            const categorySpan = document.createElement('span');
+            categorySpan.className = 'news-category';
+            categorySpan.textContent = `${catEmoji} ${catLabel}`;
+
+            const sourceSpan = document.createElement('span');
+            sourceSpan.className = 'news-source';
+            sourceSpan.textContent = item.source;
+
+            metaDiv.appendChild(categorySpan);
+            metaDiv.appendChild(sourceSpan);
+
+            const dateSpan = document.createElement('span');
+            dateSpan.textContent = item.date;
+
+            metaEl.appendChild(metaDiv);
+            metaEl.appendChild(dateSpan);
+
+            const titleEl = document.createElement('h3');
+            titleEl.className = 'news-title';
+
+            const linkEl = document.createElement('a');
+            linkEl.href = item.url;
+            linkEl.target = '_blank';
+            linkEl.textContent = item.title;
+
+            titleEl.appendChild(linkEl);
+
+            newsEl.appendChild(metaEl);
+            newsEl.appendChild(titleEl);
+
+            if (item.summary) {
+                const summaryEl = document.createElement('p');
+                summaryEl.className = 'news-summary';
+                summaryEl.textContent = item.summary;
+                newsEl.appendChild(summaryEl);
+            }
+
+            return newsEl;
         }
 
         async function searchNews() {
@@ -332,9 +398,10 @@
             const category = document.getElementById('newsCategory').value;
             
             try {
-                const url = `/api/news/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}`;
+                const url = `/api/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}`;
                 const response = await fetch(url);
-                const news = await response.json();
+                const results = await response.json();
+                const news = results.news;
                 
                 const newsGrid = document.getElementById('newsGrid');
                 newsGrid.innerHTML = '';
@@ -345,23 +412,7 @@
                 }
                 
                 news.forEach(item => {
-                    const newsEl = document.createElement('div');
-                    newsEl.className = 'news-item';
-                    const catLabel = CATEGORY_LABELS[item.category] || item.category || '';
-                    const catEmoji = CATEGORY_EMOJI[item.category] || '';
-                    newsEl.innerHTML = `
-                        <div class="news-meta">
-                            <div>
-                                <span class="news-category">${catEmoji} ${catLabel}</span>
-                                <span class="news-source">${item.source}</span>
-                            </div>
-                            <span>${item.date}</span>
-                        </div>
-                        <h3 class="news-title">
-                            <a href="${item.url}" target="_blank">${item.title}</a>
-                        </h3>
-                        ${item.summary ? `<p class="news-summary">${item.summary}</p>` : ''}
-                    `;
+                    const newsEl = createNewsElement(item);
                     newsGrid.appendChild(newsEl);
                 });
             } catch (error) {
@@ -381,23 +432,7 @@
                 newsGrid.innerHTML = '';
                 
                 news.forEach(item => {
-                    const newsEl = document.createElement('div');
-                    newsEl.className = 'news-item';
-                    const catLabel = CATEGORY_LABELS[item.category] || item.category || '';
-                    const catEmoji = CATEGORY_EMOJI[item.category] || '';
-                    newsEl.innerHTML = `
-                        <div class="news-meta">
-                            <div>
-                                <span class="news-category">${catEmoji} ${catLabel}</span>
-                                <span class="news-source">${item.source}</span>
-                            </div>
-                            <span>${item.date}</span>
-                        </div>
-                        <h3 class="news-title">
-                            <a href="${item.url}" target="_blank">${item.title}</a>
-                        </h3>
-                        ${item.summary ? `<p class="news-summary">${item.summary}</p>` : ''}
-                    `;
+                    const newsEl = createNewsElement(item);
                     newsGrid.appendChild(newsEl);
                 });
             } catch (error) {
