@@ -46,6 +46,27 @@
                         <button class="filter-btn active" onclick="loadNews()">초기화</button>
                     </div>
                 </div>
+
+                <!-- Pagination Controls -->
+                <div id="pagination-controls" class="pagination-controls">
+                    <div>
+                        <label for="pageSize" style="font-size: 0.9rem; margin-right: 0.5rem;">페이지당 항목 수:</label>
+                        <select id="pageSize" onchange="changeLimit(this.value)" class="search-input" style="width: auto;">
+                            <option value="10" {% if pagination.limit == 10 %}selected{% endif %}>10</option>
+                            <option value="20" {% if pagination.limit == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if pagination.limit == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if pagination.limit == 100 %}selected{% endif %}>100</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <button id="prevPage" class="filter-btn" onclick="changePage('prev')" {% if pagination.page <= 1 %}disabled{% endif %}>이전</button>
+                        <span id="pageInfo">페이지 {{ pagination.page }} / {{ pagination.total_pages }}</span>
+                        <button id="nextPage" class="filter-btn" onclick="changePage('next')" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>다음</button>
+                    </div>
+                    <div style="font-size: 0.9rem; color: #555;">
+                        총 <strong id="totalItems">{{ pagination.total_items }}</strong>개
+                    </div>
+                </div>
                 
                 {% set category_labels = {'malware':'악성코드','vulnerability':'취약점','network':'네트워크','web':'웹 보안','crypto':'암호학','trend':'기타'} %}
                 <div class="news-grid" id="newsGrid">
@@ -86,6 +107,7 @@
                             <a href="{{ news.url }}" target="_blank" style="color: #667eea; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
                                 원문 보기 →
                             </a>
+                            <button class="delete-btn" onclick="deleteNews('{{ news.id }}')">삭제</button>
                         </div>
                     </div>
                     {% endfor %}

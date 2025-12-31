@@ -1,5 +1,5 @@
 import bleach
-from fastapi import FastAPI, Depends, Request, BackgroundTasks
+from fastapi import FastAPI, Depends, Request, BackgroundTasks, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -10,6 +10,7 @@ from crawler.crawler import crawl_all
 from data_utils import get_wiki_preview, get_wiki_highlights, clean_news_summary
 from datetime import datetime
 import os
+import math
 
 
 # Elasticsearch와 AI 요약 임포트 (선택적)
@@ -59,13 +60,25 @@ async def startup_event():
         threading.Thread(target=init_es, daemon=True).start()
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request, db: Session = Depends(get_db)):
+async def home(
+    request: Request, 
+    db: Session = Depends(get_db),
+    page: int = 1,
+    limit: int = 20
+):
     """메인 페이지"""
-    news_list = db.query(News).order_by(News.created_at.desc()).limit(50).all()
+    news_query = db.query(News).order_by(News.created_at.desc())
+    
+    total_news = news_query.count()
+    total_pages = math.ceil(total_news / limit) if total_news > 0 else 1
+    
+    offset = (page - 1) * limit
+    news_list = news_query.offset(offset).limit(limit).all()
+    
     wiki_list = db.query(Wiki).order_by(Wiki.created_at.desc()).all()
     
     stats = {
-        "news_count": db.query(News).count(),
+        "news_count": total_news,
         "wiki_count": db.query(Wiki).count(),
         "es_enabled": ES_ENABLED
     }
@@ -74,14 +87,31 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "news_list": news_list,
         "wiki_list": wiki_list,
-        "stats": stats
+        "stats": stats,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "total_items": total_news
+        }
     })
 
 @app.get("/api/news")
-async def get_news(db: Session = Depends(get_db)):
+async def get_news(
+    db: Session = Depends(get_db),
+    page: int = 1,
+    limit: int = 20
+):
     """뉴스 API"""
-    news = db.query(News).order_by(News.created_at.desc()).limit(50).all()
-    return [
+    news_query = db.query(News).order_by(News.created_at.desc())
+    
+    total_news = news_query.count()
+    total_pages = math.ceil(total_news / limit) if total_news > 0 else 1
+    
+    offset = (page - 1) * limit
+    news = news_query.offset(offset).limit(limit).all()
+
+    news_data = [
         {
             "id": n.id,
             "title": n.title,
@@ -93,6 +123,35 @@ async def get_news(db: Session = Depends(get_db)):
         }
         for n in news
     ]
+    
+    return {
+        "news": news_data,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "total_items": total_news
+        }
+    }
+
+@app.delete("/api/news/{news_id}", status_code=200)
+async def delete_news_item(news_id: int, db: Session = Depends(get_db)):
+    """뉴스 기사 삭제"""
+    news_item = db.query(News).filter(News.id == news_id).first()
+    if not news_item:
+        raise HTTPException(status_code=404, detail="뉴스를 찾을 수 없습니다.")
+    
+    db.delete(news_item)
+    db.commit()
+    
+    # ES에서도 삭제 (필요 시)
+    if ES_ENABLED:
+        try:
+            get_es_client().delete(index="news", id=news_id, ignore=[404])
+        except Exception as e:
+            print(f"ES 뉴스 삭제 오류: {e}")
+
+    return {"message": "뉴스가 성공적으로 삭제되었습니다."}
 
 @app.get("/api/wiki")
 async def get_wiki(db: Session = Depends(get_db)):
@@ -151,30 +210,70 @@ async def summarize_news_endpoint(news_id: int, db: Session = Depends(get_db)):
         return {"success": False, "error": "요약 생성 실패"}
 
 @app.get("/api/search")
-async def search(q: str, db: Session = Depends(get_db)):
+async def search(
+    q: str = "", 
+    db: Session = Depends(get_db),
+    page: int = 1,
+    limit: int = 20,
+    category: str = ""
+):
     """통합 검색 (Elasticsearch 사용)"""
-    if not q:
-        return {"news": [], "wiki": []}
-    
+    # Elasticsearch path
     if ES_ENABLED:
         try:
-            results = search_all(q)
-            return results
-        except Exception as e:
-            pass  # ES 비활성화 시 조용히 무시
+            es_results = search_all(q, page=page, limit=limit, category=category)
+            total_news = es_results["news_total"]
+            total_pages = math.ceil(total_news / limit) if total_news > 0 else 1
+            
+            return {
+                "news": es_results["news"],
+                "wiki": es_results["wiki"],
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": total_pages,
+                    "total_items": total_news
+                }
+            }
+        except Exception:
+            pass  # Fallback to SQLite
     
     # Fallback: SQLite 검색
-    news = db.query(News).filter(
-        (News.title.contains(q)) | (News.summary.contains(q))
-    ).limit(20).all()
+    news_query = db.query(News)
+    if q:
+        news_query = news_query.filter(
+            (News.title.contains(q)) | (News.summary.contains(q))
+        )
+    if category:
+        news_query = news_query.filter(News.category == category)
+        
+    total_news = news_query.count()
+    total_pages = math.ceil(total_news / limit) if total_news > 0 else 1
+    offset = (page - 1) * limit
     
-    wikis = db.query(Wiki).filter(
-        (Wiki.title.contains(q)) | (Wiki.preview.contains(q)) | (Wiki.content.contains(q))
-    ).limit(20).all()
+    news = news_query.order_by(News.created_at.desc()).offset(offset).limit(limit).all()
+    
+    # 위키 검색 (요청 시 페이징 미적용)
+    wikis = []
+    if q:
+        wikis = db.query(Wiki).filter(
+            (Wiki.title.contains(q)) | (Wiki.preview.contains(q)) | (Wiki.content.contains(q))
+        ).limit(20).all()
+    
+    news_data = [{
+        "id": n.id, "title": n.title, "source": n.source, "summary": n.summary, 
+        "url": n.url, "category": n.category, "date": n.date
+    } for n in news]
     
     return {
-        "news": [{"id": n.id, "title": n.title, "source": n.source, "summary": n.summary, "url": n.url} for n in news],
-        "wiki": [{"id": w.id, "title": w.title, "category": w.category, "preview": w.preview} for w in wikis]
+        "news": news_data,
+        "wiki": [{"id": w.id, "title": w.title, "category": w.category, "preview": w.preview, "tags":w.tags} for w in wikis],
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "total_items": total_news
+        }
     }
 
 @app.post("/api/wiki/add")
@@ -252,7 +351,11 @@ async def wiki_delete(wiki_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     # ES에서도 삭제 (구현되어 있다면)
-    # if ES_ENABLED: es.delete(index="wiki", id=wiki_id)
+    if ES_ENABLED:
+        try:
+            get_es_client().delete(index="wiki", id=wiki_id, ignore=[404])
+        except Exception as e:
+            print(f"ES 위키 삭제 오류: {e}")
     
     return JSONResponse({"success": True, "message": "삭제되었습니다."})
 

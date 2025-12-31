@@ -81,6 +81,7 @@ def create_indices():
                     "analyzer": "nori_analyzer"
                 },
                 "type": {"type": "keyword"},
+                "tags": {"type": "keyword"},
                 "created_at": {"type": "date"}
             }
         }
@@ -120,41 +121,50 @@ def index_wiki(wiki_item):
         "preview": wiki_item.preview or "",
         "content": wiki_item.content or "",
         "type": wiki_item.type,
+        "tags": [tag.strip() for tag in (wiki_item.tags or "").split(",") if tag.strip()],
         "created_at": wiki_item.created_at
     }
     es.index(index="wiki", id=wiki_item.id, document=doc)
 
-def search_all(query, size=20):
-    """뉴스와 위키 통합 검색"""
+def search_all(query, page=1, limit=20, category=None):
+    """뉴스와 위키 통합 검색 (페이지네이션 및 필터링 지원)"""
     es = get_es_client()
     
-    # 뉴스 검색
-    news_query = {
-        "query": {
-            "multi_match": {
-                "query": query,
-                "fields": ["title^3", "summary"],
-                "type": "best_fields"
+    # 공통 쿼리 구성
+    def build_query(fields, is_wiki=False):
+        if query:
+            base_query = {
+                "multi_match": {
+                    "query": query,
+                    "fields": fields,
+                    "type": "best_fields"
+                }
             }
-        },
-        "size": size
-    }
+        else:
+            base_query = {"match_all": {}}
+
+        must_clauses = [base_query]
+        if category and (is_wiki or category in ['malware', 'vulnerability', 'network', 'web', 'crypto', 'trend']):
+             must_clauses.append({"term": {"category": category}})
+
+        return {
+            "query": {"bool": {"must": must_clauses}},
+            "from": (page - 1) * limit,
+            "size": limit,
+            "track_total_hits": True
+        }
+
+    # 뉴스 검색
+    news_query = build_query(fields=["title^3", "summary"])
     news_results = es.search(index="news", body=news_query)
     
     # 위키 검색
-    wiki_query = {
-        "query": {
-            "multi_match": {
-                "query": query,
-                "fields": ["title^3", "preview", "content"],
-                "type": "best_fields"
-            }
-        },
-        "size": size
-    }
+    wiki_query = build_query(fields=["title^3", "preview", "content", "tags"], is_wiki=True)
     wiki_results = es.search(index="wiki", body=wiki_query)
     
     return {
         "news": [hit["_source"] for hit in news_results["hits"]["hits"]],
-        "wiki": [hit["_source"] for hit in wiki_results["hits"]["hits"]]
+        "news_total": news_results["hits"]["total"]["value"],
+        "wiki": [hit["_source"] for hit in wiki_results["hits"]["hits"]],
+        "wiki_total": wiki_results["hits"]["total"]["value"],
     }
