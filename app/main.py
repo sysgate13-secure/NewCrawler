@@ -15,7 +15,7 @@ import math
 
 # Elasticsearch와 AI 요약 임포트 (선택적)
 try:
-    from app.elasticsearch_client import create_indices, index_news, index_wiki, search_all, get_es_client
+    from app.elasticsearch_client import create_indices, index_news, index_wiki, search_all, get_es_client, search_news, search_wiki
     from app.ai_summarizer import summarize_news
     # 기본적으로 켜져 있으나 USE_ELASTICSEARCH=false 설정 시 비활성화
     ES_ENABLED = os.getenv("USE_ELASTICSEARCH", "true").lower() == "true"
@@ -180,7 +180,7 @@ async def run_crawler(background_tasks: BackgroundTasks, db: Session = Depends(g
         
         return {"success": True, "count": count}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "str(e)"}
 
 @app.post("/api/news/{news_id}/summarize")
 async def summarize_news_endpoint(news_id: int, db: Session = Depends(get_db)):
@@ -211,33 +211,63 @@ async def summarize_news_endpoint(news_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/search")
 async def search(
-    q: str = "", 
+    q: str = "",
     db: Session = Depends(get_db),
     page: int = 1,
     limit: int = 20,
-    category: str = ""
+    category: str = "",
+    index: str = "all"  # 'news', 'wiki', or 'all'
 ):
     """통합 검색 (Elasticsearch 사용)"""
-    # Elasticsearch path
-    if ES_ENABLED:
+    if not ES_ENABLED:
+        # Fallback to SQLite if ES is disabled
+        pass  # The original SQLite fallback logic will be executed at the end
+
+    else:
         try:
-            es_results = search_all(q, page=page, limit=limit, category=category)
-            total_news = es_results["news_total"]
-            total_pages = math.ceil(total_news / limit) if total_news > 0 else 1
-            
-            return {
-                "news": es_results["news"],
-                "wiki": es_results["wiki"],
-                "pagination": {
-                    "page": page,
-                    "limit": limit,
-                    "total_pages": total_pages,
-                    "total_items": total_news
+            # 뉴스만 검색
+            if index == 'news':
+                es_results = search_news(q, page=page, limit=limit, category=category)
+                total_pages = math.ceil(es_results["total"] / limit) if es_results["total"] > 0 else 1
+                return {
+                    "news": es_results["results"],
+                    "wiki": [],
+                    "pagination": {
+                        "page": page, "limit": limit, "total_pages": total_pages, "total_items": es_results["total"]
+                    }
                 }
-            }
+
+            # 위키만 검색
+            elif index == 'wiki':
+                es_results = search_wiki(q, page=page, limit=limit, category=category)
+                total_pages = math.ceil(es_results["total"] / limit) if es_results["total"] > 0 else 1
+                return {
+                    "news": [],
+                    "wiki": es_results["results"],
+                    "pagination": {
+                        "page": page, "limit": limit, "total_pages": total_pages, "total_items": es_results["total"]
+                    }
+                }
+
+            # 기본: 전체 검색
+            else: # index == 'all'
+                es_results = search_all(q, page=page, limit=limit, category=category)
+                total_news = es_results["news_total"]
+                total_pages = math.ceil(total_news / limit) if total_news > 0 else 1
+                
+                return {
+                    "news": es_results["news"],
+                    "wiki": es_results["wiki"],
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total_pages": total_pages,
+                        "total_items": total_news
+                    }
+                }
         except Exception:
             pass  # Fallback to SQLite
-    
+
     # Fallback: SQLite 검색
     news_query = db.query(News)
     if q:
