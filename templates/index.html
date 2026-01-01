@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>보안 뉴스 크롤링 & 지식 공유 플랫폼</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v=1.1">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='favicon.ico') }}">
 </head>
 <body>
@@ -12,27 +13,29 @@
         <div class="nav-container">
             <div class="logo">🔒 보안 뉴스 플랫폼</div>
             <nav>
-                <ul class="nav-menu">
+                <ul class="nav-menu" id="nav-menu">
                     <li><a href="#" class="nav-link active" data-section="news">뉴스</a></li>
                     <li><a href="#" class="nav-link" data-section="wiki">지식 사전</a></li>
                     <li><a href="#" class="nav-link" data-section="dashboard">대시보드</a></li>
-                    <li><a href="/wiki/manage">📝 위키 관리</a></li>
+                    <li><a href="/wiki/manage" class="nav-link">📝 위키 관리</a></li>
                 </ul>
             </nav>
+            <button class="nav-toggle" id="nav-toggle" aria-label="메뉴 토글">
+                <span class="hamburger"></span>
+            </button>
         </div>
     </header>
 
     <div class="main-container">
         <main class="content-area">
-            <div id="news-section" class="news-content">
+            <div id="news-section" class="news-content active">
                 <div class="section-header">
                     <h1 class="section-title">최신 보안 뉴스</h1>
-                    <button class="crawl-btn" onclick="runCrawler()">🔄 크롤링</button>
+                    <button class="btn btn-secondary crawl-btn" onclick="runCrawler()">🔄 크롤링</button>
                 </div>
                 
-                <!-- 검색 및 필터 -->
-                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
-                    <div class="search-filter-grid" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem;">
+                <div class="filter-controls">
+                    <div class="search-filter-grid">
                         <input type="text" id="newsSearch" placeholder="뉴스 검색..." class="search-input" onkeyup="filterNews()">
                         <select id="newsCategory" class="search-input" onchange="fetchNews()">
                             <option value="">전체 카테고리</option>
@@ -43,27 +46,22 @@
                             <option value="web">웹 보안</option>
                             <option value="crypto">암호학</option>
                         </select>
-                        <button class="filter-btn active" onclick="loadNews()">초기화</button>
+                        <button class="btn" onclick="loadNews()">초기화</button>
                     </div>
                 </div>
 
-                <!-- Pagination Controls -->
-                <div id="pagination-controls" class="pagination-controls">
-                    <div>
-                        <label for="pageSize" style="font-size: 0.9rem; margin-right: 0.5rem;">페이지당 항목 수:</label>
-                        <select id="pageSize" onchange="changeLimit(this.value)" class="search-input" style="width: auto;">
+                <div id="pagination-controls" class="d-flex justify-content-between align-items-center">
+                    <div class="page-size-select">
+                        <label for="pageSize">항목 수:</label>
+                        <select id="pageSize" onchange="changeLimit(this.value)" class="form-select" style="width: auto; display: inline-block;">
                             <option value="10" {% if pagination.limit == 10 %}selected{% endif %}>10</option>
                             <option value="20" {% if pagination.limit == 20 %}selected{% endif %}>20</option>
                             <option value="50" {% if pagination.limit == 50 %}selected{% endif %}>50</option>
                             <option value="100" {% if pagination.limit == 100 %}selected{% endif %}>100</option>
                         </select>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 1rem;">
-                        <button id="prevPage" class="filter-btn" onclick="changePage('prev')" {% if pagination.page <= 1 %}disabled{% endif %}>이전</button>
-                        <span id="pageInfo">페이지 {{ pagination.page }} / {{ pagination.total_pages }}</span>
-                        <button id="nextPage" class="filter-btn" onclick="changePage('next')" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>다음</button>
-                    </div>
-                    <div style="font-size: 0.9rem; color: #555;">
+                    <nav id="pagination-nav"></nav>
+                    <div class="page-info-total">
                         총 <strong id="totalItems">{{ pagination.total_items }}</strong>개
                     </div>
                 </div>
@@ -73,19 +71,15 @@
                     {% for news in news_list %}
                     <div class="news-item" data-category="{{ news.category or '' }}">
                         <div class="news-meta">
-                            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                                <span class="news-category">{{ category_labels.get(news.category, news.category) }}</span>
+                            <div class="news-meta-start">
+                                <span class="badge badge-category">{{ category_labels.get(news.category, news.category) }}</span>
                                 {% if '보안뉴스' in news.source %}
-                                <span class="news-source" style="background: linear-gradient(135deg, #667eea, #764ba2);">
-                                    🇰🇷 {{ news.source }}
-                                </span>
+                                <span class="badge badge-source-kr">🇰🇷 {{ news.source }}</span>
                                 {% else %}
-                                <span class="news-source" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
-                                    🌍 {{ news.source }}
-                                </span>
+                                <span class="badge badge-source-en">🌍 {{ news.source }}</span>
                                 {% endif %}
                             </div>
-                            <span style="color: #999; font-size: 0.85rem;">{{ news.date }}</span>
+                            <span>{{ news.date }}</span>
                         </div>
                         <h3 class="news-title">
                             <a href="{{ news.url }}" target="_blank">{{ news.title }}</a>
@@ -93,21 +87,18 @@
                         {% if news.summary %}
                         <p class="news-summary">{{ news.summary | clean_summary }}</p>
                         {% endif %}
-                        <div style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center;">
-                            <div style="font-size: 0.8rem; color: #6c757d;">
+                        <div class="news-footer">
+                            <div>
                                 📰 출처: 
                                 {% if '보안뉴스' in news.source %}
-                                <a href="https://www.boannews.com" target="_blank" style="color: #667eea; text-decoration: none;">www.boannews.com</a>
+                                <a href="https://www.boannews.com" target="_blank">www.boannews.com</a>
                                 {% elif 'HackRead' in news.source %}
-                                <a href="https://www.hackread.com" target="_blank" style="color: #f093fb; text-decoration: none;">www.hackread.com</a>
+                                <a href="https://www.hackread.com" target="_blank">www.hackread.com</a>
                                 {% else %}
                                 <span>{{ news.source }}</span>
                                 {% endif %}
                             </div>
-                            <a href="{{ news.url }}" target="_blank" style="color: #667eea; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
-                                원문 보기 →
-                            </a>
-                            <button class="delete-btn" onclick="deleteNews('{{ news.id }}')">삭제</button>
+                            <button class="btn btn-danger" onclick="deleteNews('{{ news.id }}')">삭제</button>
                         </div>
                     </div>
                     {% endfor %}
@@ -120,32 +111,33 @@
                 </div>
                 <div id="wikiGrid" class="wiki-grid">
                     {% for wiki in wiki_list %}
-                    <div class="wiki-card" onclick="location.href='/wiki/{{ wiki.id }}'">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <div class="wiki-category">{{ wiki.category }}</div>
-                            {% if wiki.type == 'auto' %}
-                            <span style="background: #e3f2fd; color: #1976d2; padding: 0.2rem 0.6rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">
-                                🤖 자동수집
-                            </span>
-                            {% elif wiki.type == 'manual' %}
-                            <span style="background: #f3e5f5; color: #7b1fa2; padding: 0.2rem 0.6rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">
-                                ✍️ 수동작성
-                            </span>
-                            {% else %}
-                            <span style="background: #e8f5e9; color: #388e3c; padding: 0.2rem 0.6rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">
-                                📚 전문문서
-                            </span>
+                    <div class="wiki-card">
+                        <div class="wiki-header">
+                            <div class="badge badge-category">{{ wiki.category }}</div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                {% if wiki.type == 'auto' %}
+                                <span class="badge badge-wiki-auto">🤖 자동수집</span>
+                                {% elif wiki.type == 'manual' %}
+                                <span class="badge badge-wiki-manual">✍️ 수동작성</span>
+                                {% else %}
+                                <span class="badge badge-wiki-expert">📚 전문문서</span>
+                                {% endif %}
+                                <button class="btn btn-danger"
+                                    style="padding: 2px 8px; font-size: 0.75rem; line-height: 1.4;"
+                                    onclick="event.stopPropagation(); deleteWiki('{{ wiki.id }}', this.closest('.wiki-card'))">삭제</button>
+                            </div>
+                        </div>
+                        <div onclick="location.href='/wiki/{{ wiki.id }}'">
+                            <h3 class="wiki-title">{{ wiki.title }}</h3>
+                            <p class="wiki-preview">{{ wiki | wiki_preview('medium') }}</p>
+                            {% if wiki.tags %}
+                            <div class="wiki-tags">
+                                {% for t in (wiki.tags.split(',') if wiki.tags else []) %}
+                                <span class="tag">#{{ t }}</span>
+                                {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
-                        <h3 class="wiki-title">{{ wiki.title }}</h3>
-                        <p class="wiki-preview">{{ wiki | wiki_preview('medium') }}</p>
-                        {% if wiki.tags %}
-                        <div style="margin:10px 0 0 0;">
-                            {% for t in (wiki.tags.split(',') if wiki.tags else []) %}
-                            <span style="display:inline-block;background:#eef2ff;color:#3730a3;padding:0.2rem 0.5rem;border-radius:8px;margin-right:6px;font-size:0.8rem;">#{{ t }}</span>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -166,14 +158,13 @@
                     </div>
                 </div>
 
-                <!-- 크롤링 소스 정보 -->
                 <div class="dashboard-section-title">크롤링 소스</div>
                 <div class="crawl-sources">
                     <div class="source-card">
                         <h4>🇰🇷 국내 소스 (1개)</h4>
                         <ul>
                             <li><strong>보안뉴스</strong> - www.boannews.com<br>
-                                <small style="color: #999;">국내 최대 정보보안 전문 미디어</small>
+                                <small>국내 최대 정보보안 전문 미디어</small>
                             </li>
                         </ul>
                     </div>
@@ -181,41 +172,37 @@
                         <h4>🌍 해외 소스 (1개)</h4>
                         <ul>
                             <li><strong>HackRead</strong> - hackread.com<br>
-                                <small style="color: #999;">사이버 보안 뉴스 및 해킹 관련 정보</small>
+                                <small>사이버 보안 뉴스 및 해킹 관련 정보</small>
                             </li>
                         </ul>
                     </div>
                 </div>
 
-                <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #ffc107;">
-                    <p style="margin: 0; color: #856404;">
+                <div class="info-box">
+                    <p>
                         <strong>ℹ️ 크롤링 소스 정보</strong><br>
                         현재 2개의 안정적인 소스에서 뉴스를 자동 수집하고 있습니다.<br>
                         매일 자동 크롤링 또는 수동으로 "크롤링" 버튼을 눌러 최신 뉴스를 받아올 수 있습니다.
                     </p>
                 </div>
 
-                <!-- 소스별 통계 -->
                 <div class="dashboard-section-title">소스별 뉴스 수</div>
-                <div id="source-stats" class="source-stats">
+                <div id="source-stats" class="source-stats card">
                     <div class="stats-loading">로드 중...</div>
                 </div>
 
-                <!-- 카테고리별 통계 -->
                 <div class="dashboard-section-title">카테고리별 통계</div>
-                <div class="category-stats-grid">
-                    <div id="category-stats" class="category-stats">
-                        <div class="stats-loading">로드 중...</div>
-                    </div>
+                <div id="category-stats" class="category-stats-grid">
+                    <div class="stats-loading">로드 중...</div>
                 </div>
             </div>
         </main>
 
         <aside class="sidebar">
-            <div class="search-box">
+            <div class="card sidebar-card">
                 <input type="text" class="search-input" placeholder="뉴스 및 지식 검색..." onkeyup="searchContent(this.value)">
             </div>
-            <div class="categories">
+            <div class="card sidebar-card">
                 <h3>카테고리</h3>
                 <ul class="category-list">
                     <li onclick="filterByCategory('network')">🌐 네트워크 보안</li>
@@ -229,5 +216,64 @@
     </div>
 
     <script src="{{ url_for('static', path='js/main.js') }}"></script>
+    <script>
+        function deleteWiki(wikiId, cardElement) {
+            if (!confirm('정말로 이 위키 문서를 삭제하시겠습니까?')) return;
+
+            fetch(`/api/wiki/${wikiId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ 위키가 삭제되었습니다.');
+                    // 애니메이션과 함께 카드 제거
+                    if (cardElement) {
+                        cardElement.style.transition = 'opacity 0.5s, transform 0.5s';
+                        cardElement.style.opacity = '0';
+                        cardElement.style.transform = 'scale(0.9)';
+                        setTimeout(() => cardElement.remove(), 500);
+                    }
+                } else {
+                    alert('❌ 삭제 실패: ' + (data.error || '알 수 없는 오류'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('❌ 삭제 중 오류가 발생했습니다.');
+            });
+        }
+
+        function renderPagination(totalPages, currentPage) {
+            const paginationNav = document.getElementById('pagination-nav');
+            let paginationHtml = '<ul class="pagination">';
+
+            // Previous button
+            paginationHtml += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="changePage('prev')">이전</a>
+            </li>`;
+
+            // Page numbers
+            for (let i = 1; i <= totalPages; i++) {
+                paginationHtml += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                </li>`;
+            }
+
+            // Next button
+            paginationHtml += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="changePage('next')">다음</a>
+            </li>`;
+
+            paginationHtml += '</ul>';
+            paginationNav.innerHTML = paginationHtml;
+        }
+
+        // Initial render
+        renderPagination({{ pagination.total_pages }}, {{ pagination.page }});
+    </script>
 </body>
 </html>

@@ -370,32 +370,60 @@ async def wiki_edit(wiki_id: int, request: Request, db: Session = Depends(get_db
             
     return JSONResponse({"success": True, "message": "수정되었습니다."})
 
+def delete_es_wiki_background(wiki_id: int):
+    """백그라운드에서 Elasticsearch의 위키 문서를 삭제합니다."""
+    try:
+        get_es_client().delete(index="wiki", id=wiki_id, ignore=[404])
+        print(f"✅ ES에서 위키 ID {wiki_id}가 삭제되었습니다.")
+    except Exception as e:
+        print(f"❌ ES 위키 삭제 오류 (ID: {wiki_id}): {e}")
+
 @app.post("/api/wiki/{wiki_id}/delete")
-async def wiki_delete(wiki_id: int, db: Session = Depends(get_db)):
-    """위키 삭제 처리"""
+async def wiki_delete(
+    wiki_id: int, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """위키 삭제 처리 (ES 삭제는 백그라운드 수행)"""
     wiki = db.query(Wiki).filter(Wiki.id == wiki_id).first()
     if not wiki:
         return JSONResponse({"success": False, "error": "위키를 찾을 수 없습니다"})
     
+    # DB에서 즉시 삭제
     db.delete(wiki)
     db.commit()
     
-    # ES에서도 삭제 (구현되어 있다면)
+    # ES 삭제는 백그라운드 작업으로 위임하여 응답 속도 개선
     if ES_ENABLED:
-        try:
-            get_es_client().delete(index="wiki", id=wiki_id, ignore=[404])
-        except Exception as e:
-            print(f"ES 위키 삭제 오류: {e}")
+        background_tasks.add_task(delete_es_wiki_background, wiki_id)
     
     return JSONResponse({"success": True, "message": "삭제되었습니다."})
 
 @app.get("/wiki/manage", response_class=HTMLResponse)
-async def wiki_manage(request: Request, db: Session = Depends(get_db)):
+async def wiki_manage(
+    request: Request,
+    db: Session = Depends(get_db),
+    page: int = 1,
+    limit: int = 10
+):
     """위키 관리 페이지"""
-    wikis = db.query(Wiki).order_by(Wiki.created_at.desc()).all()
+    wiki_query = db.query(Wiki).order_by(Wiki.created_at.desc())
+    
+    total_wikis = wiki_query.count()
+    total_pages = math.ceil(total_wikis / limit) if total_wikis > 0 else 1
+    
+    offset = (page - 1) * limit
+    wikis = wiki_query.offset(offset).limit(limit).all()
+    
     return templates.TemplateResponse("wiki_manage.html", {
         "request": request,
-        "wikis": wikis
+        "wikis": wikis,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "total_items": total_wikis
+        }
     })
 
 @app.get("/wiki/{wiki_id}", response_class=HTMLResponse)

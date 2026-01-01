@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>위키 관리 - 보안 뉴스 플랫폼</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <style>
         * {
@@ -213,7 +214,7 @@
         </div>
         {% if not wiki_to_edit %}
         <div class="card">
-            <h2>기존 위키 목록 ({{ wikis|length }}개)</h2>
+            <h2>기존 위키 목록 ({{ pagination.total_items }}개)</h2>
             <div class="wiki-list">
                 {% for wiki in wikis %}
                 <div class="wiki-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -235,6 +236,29 @@
                 </div>
                 {% endfor %}
             </div>
+
+            {% if pagination.total_pages > 1 %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if pagination.page <= 1 %}disabled{% endif %}">
+                        <a class="page-link" href="?page={{ pagination.page - 1 }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% for i in range(1, pagination.total_pages + 1) %}
+                    <li class="page-item {% if i == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="?page={{ i }}">{{ i }}</a>
+                    </li>
+                    {% endfor %}
+                    <li class="page-item {% if pagination.page >= pagination.total_pages %}disabled{% endif %}">
+                        <a class="page-link" href="?page={{ pagination.page + 1 }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+
         </div>
         {% endif %}
     </div>

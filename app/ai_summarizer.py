@@ -1,12 +1,58 @@
 import requests
 import os
 import json
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # LM Studio 로컬 서버 설정
 LM_STUDIO_URL = "http://localhost:12345/v1/chat/completions"
+MAX_RETRIES = 3
+INITIAL_BACKOFF = 2
+
+def _call_llm_api_with_retry(payload, timeout):
+    """LLM API를 재시도 로직과 함께 호출합니다."""
+    last_exception = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            headers = {"Content-Type": "application/json"}
+            response = requests.post(LM_STUDIO_URL, data=json.dumps(payload), headers=headers, timeout=timeout)
+            
+            # {"type":"retry"} 형태의 에러 응답 처리
+            if response.status_code == 200:
+                try:
+                    json_response = response.json()
+                    # 성공적인 응답에서 'choices' 키 확인
+                    if 'choices' in json_response and len(json_response['choices']) > 0:
+                        return json_response['choices'][0]['message']['content'].strip()
+                except json.JSONDecodeError:
+                    # 응답이 JSON이 아닐 경우, 재시도해야 할 수 있는 에러 메시지인지 확인
+                    if "retry" in response.text:
+                        print(f"재시도 가능한 오류 감지 (응답 내용: {response.text}). {attempt + 1}/{MAX_RETRIES}번째 재시도...")
+                        last_exception = Exception(f"서버가 재시도를 요청했습니다: {response.text}")
+                    else:
+                        raise Exception(f"JSON 디코딩 오류: {response.text}")
+
+            elif 500 <= response.status_code < 600:
+                print(f"서버 오류 (상태 코드: {response.status_code}). {attempt + 1}/{MAX_RETRIES}번째 재시도...")
+                last_exception = requests.exceptions.HTTPError(f"서버 오류: {response.status_code}")
+            else:
+                response.raise_for_status()
+
+        except requests.exceptions.RequestException as e:
+            print(f"네트워크 오류 발생: {e}. {attempt + 1}/{MAX_RETRIES}번째 재시도...")
+            last_exception = e
+        
+        # 재시도 전 대기 (지수 백오프)
+        if attempt < MAX_RETRIES - 1:
+            wait_time = INITIAL_BACKOFF * (2 ** attempt)
+            print(f"{wait_time}초 후 재시도합니다.")
+            time.sleep(wait_time)
+
+    # 모든 재시도 실패
+    raise Exception(f"최대 재시도 횟수({MAX_RETRIES})를 초과했습니다. 마지막 오류: {last_exception}")
+
 
 def summarize_news(title, content=None):
     """LM Studio를 사용하여 뉴스 제목과 본문을 기반으로 핵심 요약 생성"""
@@ -34,18 +80,13 @@ def summarize_news(title, content=None):
             "temperature": 0.3
         }
         
-        headers = {"Content-Type": "application/json"}
-        
-        response = requests.post(LM_STUDIO_URL, data=json.dumps(payload), headers=headers, timeout=30)
-        response.raise_for_status()
-        
-        result = response.json()
-        summary = result['choices'][0]['message']['content'].strip()
+        summary = _call_llm_api_with_retry(payload, timeout=30)
         return summary
         
     except Exception as e:
-        print(f"로컬 AI 요약 생성 오류: {e}")
+        print(f"로컬 AI 요약 생성 최종 오류: {e}")
         return ""
+
 
 def generate_wiki_content(title, category):
     """LM Studio를 사용하여 지식 사전(Wiki) 상세 내용 생성"""
@@ -74,15 +115,9 @@ def generate_wiki_content(title, category):
             "temperature": 0.5
         }
         
-        headers = {"Content-Type": "application/json"}
-        
-        response = requests.post(LM_STUDIO_URL, data=json.dumps(payload), headers=headers, timeout=60)
-        response.raise_for_status()
-        
-        result = response.json()
-        content = result['choices'][0]['message']['content'].strip()
+        content = _call_llm_api_with_retry(payload, timeout=60)
         return content
         
     except Exception as e:
-        print(f"로컬 AI 위키 생성 오류: {e}")
+        print(f"로컬 AI 위키 생성 최종 오류: {e}")
         return None
