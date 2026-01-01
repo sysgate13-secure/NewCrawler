@@ -55,18 +55,17 @@ function initializePage() {
 // ## Region: 페이지네이션 및 데이터 로드 ##
 
 function initializePagination() {
-    const pageInfoEl = document.getElementById('pageInfo');
     const pageSizeEl = document.getElementById('pageSize');
     
-    if (pageInfoEl) {
-        const pageMatch = (pageInfoEl.textContent || '').match(/(\d+)\s*\/\s*(\d+)/);
-        if (pageMatch) {
-            currentPage = parseInt(pageMatch[1], 10);
-            totalPages = parseInt(pageMatch[2], 10);
-        }
-    }
     if (pageSizeEl) {
-        currentLimit = parseInt(pageSizeEl.value, 10);
+        currentLimit = parseInt(pageSizeEl.value, 10) || 20;
+    }
+    
+    // 서버에서 전달된 초기 페이지네이션 정보 사용
+    const paginationNav = document.getElementById('pagination-nav');
+    if (paginationNav) {
+        // renderPagination이 index.html 내부 스크립트에서 이미 실행됨
+        // 초기 totalPages와 currentPage는 이미 설정됨
     }
 }
 
@@ -108,6 +107,13 @@ async function fetchNews() {
         renderNews(data.news);
         
         totalPages = data.pagination.total_pages;
+        
+        // totalItems 업데이트
+        const totalItemsEl = document.getElementById('totalItems');
+        if (totalItemsEl) {
+            totalItemsEl.textContent = data.pagination.total_items;
+        }
+        
         renderPagination(totalPages, currentPage);
 
     } catch (error) {

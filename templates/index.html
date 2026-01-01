@@ -18,6 +18,7 @@
                     <li><a href="#" class="nav-link" data-section="wiki">지식 사전</a></li>
                     <li><a href="#" class="nav-link" data-section="dashboard">대시보드</a></li>
                     <li><a href="/wiki/manage" class="nav-link">📝 위키 관리</a></li>
+                    <li><a href="/sources/manage" class="nav-link">🔗 소스 관리</a></li>
                 </ul>
             </nav>
             <button class="nav-toggle" id="nav-toggle" aria-label="메뉴 토글">
@@ -181,7 +182,7 @@
                 <div class="info-box">
                     <p>
                         <strong>ℹ️ 크롤링 소스 정보</strong><br>
-                        현재 2개의 안정적인 소스에서 뉴스를 자동 수집하고 있습니다.<br>
+                        위는 기본 내장 소스입니다. <a href="/sources/manage">🔗 소스 관리</a> 페이지에서 추가 소스를 등록하여 더 많은 뉴스를 수집할 수 있습니다.<br>
                         매일 자동 크롤링 또는 수동으로 "크롤링" 버튼을 눌러 최신 뉴스를 받아올 수 있습니다.
                     </p>
                 </div>
@@ -215,8 +216,25 @@
         </aside>
     </div>
 
-    <script src="{{ url_for('static', path='js/main.js') }}"></script>
+    <!-- main.js와 변수/함수 충돌 방지를 위해 주석 처리 (모든 기능이 아래 스크립트에 포함됨) -->
+    <!-- <script src="{{ url_for('static', path='js/main.js') }}"></script> -->
     <script>
+        // 네비게이션 메뉴 토글 기능 (main.js 대체)
+        document.addEventListener('DOMContentLoaded', () => {
+            const navToggle = document.getElementById('nav-toggle');
+            const navMenu = document.getElementById('nav-menu');
+            if (navToggle && navMenu) {
+                navToggle.addEventListener('click', () => {
+                    navMenu.classList.toggle('active');
+                });
+            }
+        });
+
+        // 서버에서 전달받은 초기 페이지네이션 정보를 전역 변수에 설정
+        var currentPage = JSON.parse('{{ pagination.page | default(1) | tojson | safe }}');
+        var totalPages = JSON.parse('{{ pagination.total_pages | default(1) | tojson | safe }}');
+        var currentLimit = JSON.parse('{{ pagination.limit | default(10) | tojson | safe }}');
+
         function deleteWiki(wikiId, cardElement) {
             if (!confirm('정말로 이 위키 문서를 삭제하시겠습니까?')) return;
 
@@ -249,31 +267,86 @@
 
         function renderPagination(totalPages, currentPage) {
             const paginationNav = document.getElementById('pagination-nav');
+            if (!paginationNav) return;
+            
             let paginationHtml = '<ul class="pagination">';
 
             // Previous button
             paginationHtml += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="changePage('prev')">이전</a>
+                <a class="page-link" href="#" onclick="event.preventDefault(); changePage('prev')">이전</a>
             </li>`;
 
             // Page numbers
             for (let i = 1; i <= totalPages; i++) {
                 paginationHtml += `<li class="page-item ${i === currentPage ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                    <a class="page-link" href="#" onclick="event.preventDefault(); changePage(${i})">${i}</a>
                 </li>`;
             }
 
             // Next button
             paginationHtml += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="changePage('next')">다음</a>
+                <a class="page-link" href="#" onclick="event.preventDefault(); changePage('next')">다음</a>
             </li>`;
 
             paginationHtml += '</ul>';
             paginationNav.innerHTML = paginationHtml;
         }
 
+        // --- 페이지네이션 및 필터링 로직 (API 호출 없이 페이지 이동 방식) ---
+
+        function changeLimit(newLimit) {
+            // 항목 수 변경 시 페이지 새로고침을 통해 안정적으로 데이터 로드
+            const url = new URL(window.location.href);
+            url.searchParams.set('limit', newLimit);
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
+        }
+
+        function changePage(page) {
+            let newPage = page;
+            if (page === 'prev') {
+                newPage = currentPage - 1;
+                if (newPage < 1) return;
+            } else if (page === 'next') {
+                newPage = currentPage + 1;
+                if (newPage > totalPages) return;
+            }
+            
+            const url = new URL(window.location.href);
+            url.searchParams.set('page', newPage);
+            window.location.href = url.toString();
+        }
+
+        function handleSearch(event) {
+            if (event.key === 'Enter') {
+                applyFilters();
+            }
+        }
+
+        function applyFilters() {
+            const searchInput = document.getElementById('newsSearch');
+            const categorySelect = document.getElementById('newsCategory');
+            const url = new URL(window.location.href);
+            
+            if (searchInput && searchInput.value) url.searchParams.set('q', searchInput.value);
+            else url.searchParams.delete('q');
+            
+            if (categorySelect && categorySelect.value) url.searchParams.set('category', categorySelect.value);
+            else url.searchParams.delete('category');
+            
+            url.searchParams.set('page', 1); // 필터 변경 시 1페이지로 초기화
+            window.location.href = url.toString();
+        }
+
+        function loadNews() {
+            // 초기화 버튼: 모든 파라미터 제거하고 홈으로 이동
+            window.location.href = window.location.pathname;
+        }
+
         // Initial render
-        renderPagination({{ pagination.total_pages }}, {{ pagination.page }});
+        document.addEventListener('DOMContentLoaded', function() {
+            renderPagination(totalPages, currentPage);
+        });
     </script>
 </body>
 </html>

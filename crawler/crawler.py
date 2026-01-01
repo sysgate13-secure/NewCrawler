@@ -600,19 +600,73 @@ def crawl_infosecurity(db: Session):
     return _generic_crawl(db, 'https://www.infosecurity-magazine.com/news/', 'infosecurity-magazine.com', 'InfoSecurity', 
                         title_selector='.webpage-title a', summary_selector='.webpage-summary')
 
+def crawl_from_db_source(db: Session, source):
+    """DB에 저장된 소스 설정을 사용하여 크롤링"""
+    try:
+        import json
+        
+        # 셀렉터 설정 파싱
+        selector_config = {}
+        if source.selector_config:
+            try:
+                selector_config = json.loads(source.selector_config)
+            except:
+                pass
+        
+        # 범용 크롤러 호출
+        title_selector = selector_config.get('title_selector')
+        summary_selector = selector_config.get('summary_selector')
+        
+        count = _generic_crawl(
+            db, 
+            source.url, 
+            source.url.split('//')[1].split('/')[0],  # 도메인 추출
+            source.name,
+            title_selector=title_selector,
+            summary_selector=summary_selector
+        )
+        
+        return count if count != -1 else 0
+    except Exception as e:
+        print(f"   ❌ {source.name} 크롤링 오류: {e}")
+        return 0
+
 def crawl_all(db: Session):
-    """모든 소스 크롤링"""
+    """모든 소스 크롤링 (DB 소스 + 기본 소스)"""
+    from app.models import CrawlSource
+    
     start_time = datetime.now()
     print(f"\n[🚀] {start_time.strftime('%Y-%m-%d %H:%M:%S')} - 크롤링을 시작합니다.")
     print("==================================================")
     
     total = 0
+    source_count = 0
 
+    # 1. DB에 등록된 활성화된 소스들 크롤링
+    try:
+        db_sources = db.query(CrawlSource).filter(CrawlSource.is_active == True).all()
+        
+        if db_sources:
+            print(f"\n[DB 소스] {len(db_sources)}개의 등록된 소스 크롤링 중...")
+            for idx, source in enumerate(db_sources, 1):
+                print(f"\n[{idx}/{len(db_sources)}] {source.name} 수집 중...")
+                count = crawl_from_db_source(db, source)
+                total += count
+                print(f"   ✅ {count}개 수집 완료")
+                time.sleep(1)
+                source_count += 1
+    except Exception as e:
+        print(f"   ⚠️ DB 소스 크롤링 오류: {e}")
+
+    # 2. 기본 내장 소스들 (하드코딩된 소스)
+    print("\n[기본 소스] 내장 크롤러 실행 중...")
+    
     print("\n[1/2] 국내 보안뉴스 수집 중...")
     res = crawl_boannews(db)
     if res != -1: 
         total += res
         print(f"   ✅ {res}개 수집 완료")
+        source_count += 1
     else:
         print("   ❌ 수집 실패")
     time.sleep(1)
@@ -623,6 +677,7 @@ def crawl_all(db: Session):
         if r != -1: 
             total += r
             print(f"   ✅ {r}개 수집 완료")
+            source_count += 1
         else:
             print("   ❌ 수집 실패")
         time.sleep(1)
@@ -636,6 +691,7 @@ def crawl_all(db: Session):
     print("\n==================================================")
     print(f"[✅] {end_time.strftime('%Y-%m-%d %H:%M:%S')} - 크롤링 완료")
     print(f"[⏱️] 총 소요 시간: {minutes}분 {seconds}초")
+    print(f"[📊] 크롤링한 소스: {source_count}개")
     print(f"[📊] 새로 추가된 뉴스: 총 {total}개")
     print("==================================================\n")
     return total

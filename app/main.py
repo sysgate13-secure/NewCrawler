@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 from app.database import engine, get_db, Base
-from app.models import News, Wiki
+from app.models import News, Wiki, CrawlSource
 from crawler.crawler import crawl_all
 from data_utils import get_wiki_preview, get_wiki_highlights, clean_news_summary
 from datetime import datetime
@@ -269,35 +269,41 @@ async def search(
             pass  # Fallback to SQLite
 
     # Fallback: SQLite 검색
-    news_query = db.query(News)
-    if q:
-        news_query = news_query.filter(
-            (News.title.contains(q)) | (News.summary.contains(q))
-        )
-    if category:
-        news_query = news_query.filter(News.category == category)
+    if index == 'news' or index == 'all':
+        news_query = db.query(News)
+        if q:
+            news_query = news_query.filter(
+                (News.title.contains(q)) | (News.summary.contains(q))
+            )
+        if category:
+            news_query = news_query.filter(News.category == category)
+            
+        total_news = news_query.count()
+        total_pages = math.ceil(total_news / limit) if total_news > 0 else 1
+        offset = (page - 1) * limit
         
-    total_news = news_query.count()
-    total_pages = math.ceil(total_news / limit) if total_news > 0 else 1
-    offset = (page - 1) * limit
+        news = news_query.order_by(News.created_at.desc()).offset(offset).limit(limit).all()
+        news_data = [{
+            "id": n.id, "title": n.title, "source": n.source, "summary": n.summary, 
+            "url": n.url, "category": n.category, "date": n.date
+        } for n in news]
+    else:
+        news_data = []
+        total_news = 0
+        total_pages = 1
     
-    news = news_query.order_by(News.created_at.desc()).offset(offset).limit(limit).all()
-    
-    # 위키 검색 (요청 시 페이징 미적용)
-    wikis = []
-    if q:
+    # 위키 검색 (index='wiki' 또는 'all'이고 검색어가 있을 때만)
+    if (index == 'wiki' or index == 'all') and q:
         wikis = db.query(Wiki).filter(
             (Wiki.title.contains(q)) | (Wiki.preview.contains(q)) | (Wiki.content.contains(q))
         ).limit(20).all()
-    
-    news_data = [{
-        "id": n.id, "title": n.title, "source": n.source, "summary": n.summary, 
-        "url": n.url, "category": n.category, "date": n.date
-    } for n in news]
+        wiki_data = [{"id": w.id, "title": w.title, "category": w.category, "preview": w.preview, "tags": w.tags} for w in wikis]
+    else:
+        wiki_data = []
     
     return {
         "news": news_data,
-        "wiki": [{"id": w.id, "title": w.title, "category": w.category, "preview": w.preview, "tags":w.tags} for w in wikis],
+        "wiki": wiki_data,
         "pagination": {
             "page": page,
             "limit": limit,
@@ -511,3 +517,81 @@ async def get_category_stats(db: Session = Depends(get_db)):
         } 
         for s in stats
     ]
+
+
+# 크롤링 소스 관리 API
+@app.get("/sources/manage", response_class=HTMLResponse)
+async def sources_manage(request: Request, db: Session = Depends(get_db)):
+    """크롤링 소스 관리 페이지"""
+    sources = db.query(CrawlSource).order_by(CrawlSource.created_at.desc()).all()
+    return templates.TemplateResponse("sources_manage.html", {
+        "request": request,
+        "sources": sources
+    })
+
+@app.get("/api/sources")
+async def get_sources(db: Session = Depends(get_db)):
+    """크롤링 소스 목록"""
+    sources = db.query(CrawlSource).order_by(CrawlSource.created_at.desc()).all()
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "url": s.url,
+            "country": s.country,
+            "description": s.description,
+            "is_active": s.is_active,
+            "created_at": s.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        for s in sources
+    ]
+
+@app.post("/api/sources/add")
+async def add_source(request: Request, db: Session = Depends(get_db)):
+    """크롤링 소스 추가"""
+    form = await request.form()
+    
+    source = CrawlSource(
+        name=bleach.clean(form.get("name")),
+        url=form.get("url"),
+        country=form.get("country"),
+        description=bleach.clean(form.get("description", "")),
+        selector_config=form.get("selector_config", "{}"),
+        is_active=True
+    )
+    db.add(source)
+    db.commit()
+    
+    return JSONResponse({
+        "success": True,
+        "id": source.id,
+        "message": "크롤링 소스가 추가되었습니다."
+    })
+
+@app.post("/api/sources/{source_id}/toggle")
+async def toggle_source(source_id: int, db: Session = Depends(get_db)):
+    """크롤링 소스 활성화/비활성화"""
+    source = db.query(CrawlSource).filter(CrawlSource.id == source_id).first()
+    if not source:
+        return JSONResponse({"success": False, "error": "소스를 찾을 수 없습니다"})
+    
+    source.is_active = not source.is_active
+    db.commit()
+    
+    return JSONResponse({
+        "success": True,
+        "is_active": source.is_active,
+        "message": f"소스가 {'활성화' if source.is_active else '비활성화'}되었습니다."
+    })
+
+@app.delete("/api/sources/{source_id}")
+async def delete_source(source_id: int, db: Session = Depends(get_db)):
+    """크롤링 소스 삭제"""
+    source = db.query(CrawlSource).filter(CrawlSource.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="소스를 찾을 수 없습니다.")
+    
+    db.delete(source)
+    db.commit()
+    
+    return {"message": "소스가 성공적으로 삭제되었습니다."}

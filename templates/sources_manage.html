@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>크롤링 소스 관리 - 보안 뉴스 플랫폼</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+    <style>
+        .source-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #667eea;
+        }
+        .source-card.inactive {
+            opacity: 0.6;
+            border-left-color: #6c757d;
+        }
+        .source-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .source-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .source-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .badge-kr {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        .badge-en {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="nav-container">
+            <div class="logo">🔒 보안 뉴스 플랫폼 - 크롤링 소스 관리</div>
+            <a href="/" class="back-link">← 메인으로</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h1>새 크롤링 소스 추가</h1>
+            <form id="sourceForm">
+                <div class="form-group">
+                    <label for="name">소스 이름</label>
+                    <input type="text" id="name" name="name" required 
+                           placeholder="예: 보안뉴스, HackRead" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="url">크롤링 URL</label>
+                    <input type="url" id="url" name="url" required 
+                           placeholder="https://example.com/news" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="country">국가</label>
+                    <select id="country" name="country" required class="form-control">
+                        <option value="kr">🇰🇷 국내</option>
+                        <option value="en">🌍 해외</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="description">설명</label>
+                    <textarea id="description" name="description" 
+                              placeholder="소스에 대한 간단한 설명" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="selector_config">셀렉터 설정 (선택사항)</label>
+                    <textarea id="selector_config" name="selector_config" 
+                              placeholder='{"title": ".news-title", "link": "a", ...}' 
+                              class="form-control" rows="3"></textarea>
+                    <small class="text-muted">JSON 형식으로 입력하세요. 비워두면 범용 크롤러가 사용됩니다.</small>
+                </div>
+                <button type="submit" class="btn btn-primary">📝 소스 추가</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>등록된 크롤링 소스 ({{ sources|length }}개)</h2>
+            <div id="sourcesList">
+                {% for source in sources %}
+                <div class="source-card {% if not source.is_active %}inactive{% endif %}" data-id="{{ source.id }}">
+                    <div class="source-header">
+                        <div>
+                            <span class="badge {% if source.country == 'kr' %}badge-kr{% else %}badge-en{% endif %}">
+                                {% if source.country == 'kr' %}🇰🇷 국내{% else %}🌍 해외{% endif %}
+                            </span>
+                            <span class="source-name">{{ source.name }}</span>
+                            {% if not source.is_active %}
+                            <span class="badge bg-secondary">비활성</span>
+                            {% endif %}
+                        </div>
+                        <div class="source-actions">
+                            <button class="btn btn-sm btn-warning" onclick="toggleSource({{ source.id }})">
+                                {% if source.is_active %}⏸️ 비활성화{% else %}▶️ 활성화{% endif %}
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteSource({{ source.id }})">
+                                🗑️ 삭제
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <strong>URL:</strong> <a href="{{ source.url }}" target="_blank">{{ source.url }}</a>
+                    </div>
+                    {% if source.description %}
+                    <div>
+                        <strong>설명:</strong> {{ source.description }}
+                    </div>
+                    {% endif %}
+                    <small class="text-muted">
+                        등록일: {{ source.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    </small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('sourceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            // 셀렉터 설정 JSON 유효성 검사
+            const selectorConfig = formData.get('selector_config');
+            if (selectorConfig) {
+                try {
+                    JSON.parse(selectorConfig);
+                } catch (error) {
+                    alert('❌ 셀렉터 설정은 유효한 JSON 형식이어야 합니다.');
+                    return;
+                }
+            }
+            
+            try {
+                const response = await fetch('/api/sources/add', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    location.reload();
+                } else {
+                    alert('❌ 실패: ' + (data.error || '알 수 없는 오류'));
+                }
+            } catch (error) {
+                alert('❌ 오류: ' + error.message);
+            }
+        });
+
+        async function toggleSource(sourceId) {
+            try {
+                const response = await fetch(`/api/sources/${sourceId}/toggle`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    location.reload();
+                } else {
+                    alert('❌ 실패: ' + data.error);
+                }
+            } catch (error) {
+                alert('❌ 오류: ' + error.message);
+            }
+        }
+
+        async function deleteSource(sourceId) {
+            if (!confirm('정말로 이 크롤링 소스를 삭제하시겠습니까?')) return;
+            
+            try {
+                const response = await fetch(`/api/sources/${sourceId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('✅ 소스가 삭제되었습니다.');
+                    location.reload();
+                } else {
+                    const data = await response.json();
+                    alert('❌ 삭제 실패: ' + (data.detail || '알 수 없는 오류'));
+                }
+            } catch (error) {
+                alert('❌ 오류: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

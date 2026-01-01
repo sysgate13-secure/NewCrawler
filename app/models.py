@@ -1,7 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 from datetime import datetime
 from app.database import Base
-from sqlalchemy import Column, Integer, String, Text, DateTime
 
 class News(Base):
     __tablename__ = "news"
@@ -36,3 +35,16 @@ class CrawlLog(Base):
     message = Column(Text)
     started_at = Column(DateTime, default=datetime.now)
     completed_at = Column(DateTime, nullable=True)
+
+class CrawlSource(Base):
+    __tablename__ = "crawl_source"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # 소스 이름 (예: "보안뉴스", "HackRead")
+    url = Column(String, nullable=False)  # 크롤링할 URL
+    country = Column(String, nullable=False)  # 'kr' 또는 'en'
+    description = Column(Text)  # 소스 설명
+    selector_config = Column(Text)  # JSON 형태의 셀렉터 설정
+    is_active = Column(Boolean, default=True)  # 활성화 여부
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
