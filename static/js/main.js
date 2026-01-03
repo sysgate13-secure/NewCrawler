@@ -7,9 +7,9 @@
 
 // ## Region: 전역 변수 및 상수 ##
 let currentSection = 'news';
-let currentPage = 1;
-let currentLimit = 20;
-let totalPages = 1;
+var currentPage = window.currentPage || 1;
+var currentLimit = window.currentLimit || 20;
+var totalPages = window.totalPages || 1;
 
 const CATEGORY_LABELS = {
     'malware': '악성코드', 'vulnerability': '취약점', 'network': '네트워크',
@@ -49,6 +49,10 @@ function initializePage() {
     initializePagination();
     // 초기 섹션 활성화
     switchSection(currentSection);
+    // 브라우저 알림 권한 요청
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+    }
 }
 
 
@@ -201,18 +205,68 @@ function createNewsElement(item) {
     return newsEl;
 }
 
+function renderPagination(totalPages, currentPage) {
+    const paginationNav = document.getElementById('pagination-nav');
+    if (!paginationNav) return;
+    
+    let paginationHtml = '<ul class="pagination">';
+
+    // Previous button
+    paginationHtml += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="event.preventDefault(); changePage('prev')">이전</a>
+    </li>`;
+
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+        paginationHtml += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="event.preventDefault(); changePage(${i})">${i}</a>
+        </li>`;
+    }
+
+    // Next button
+    paginationHtml += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="event.preventDefault(); changePage('next')">다음</a>
+    </li>`;
+
+    paginationHtml += '</ul>';
+    paginationNav.innerHTML = paginationHtml;
+}
+
 // ## Region: 기타 API 호출 및 유틸리티 ##
 
 async function runCrawler() {
-    if (!confirm('크롤링을 실행하시겠습니까?')) return;
+    const crawlBtn = document.querySelector('.crawl-btn');
+    if (!confirm('최신 뉴스를 수집하기 위해 크롤링을 실행하시겠습니까?')) return;
+
+    // 버튼 상태 변경 (시각적 피드백 및 중복 클릭 방지)
+    const originalContent = crawlBtn.innerHTML;
+    crawlBtn.disabled = true;
+    crawlBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ⏳ 크롤링 중...';
+
     try {
         const response = await fetch('/api/crawl', { method: 'POST' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        alert(`크롤링 완료: ${data.count}개의 뉴스가 추가되었습니다.`);
+        
+        const message = `✅ 크롤링 완료: ${data.count}개의 새로운 뉴스가 추가되었습니다.`;
+        
+        // 1. 브라우저 데스크톱 알림
+        if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("보안 뉴스 플랫폼", {
+                body: message,
+                icon: "/static/favicon.ico"
+            });
+        }
+        
+        // 2. 브라우저 알림창
+        alert(message);
         loadNews();
     } catch (error) {
-        alert('크롤링 실패: ' + error.message);
+        alert('❌ 크롤링 실패: ' + error.message);
+    } finally {
+        // 버튼 상태 복구
+        crawlBtn.disabled = false;
+        crawlBtn.innerHTML = originalContent;
     }
 }
 

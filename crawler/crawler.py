@@ -146,6 +146,10 @@ def crawl_boannews(db: Session):
                 if not title or len(title) < 5:
                     continue
 
+                # '[인사]' 또는 '[IP인사] 지식재산처'로 시작하는 제목 필터링
+                if title.strip().startswith(('[인사]', '[IP인사] 지식재산처')):
+                    continue
+
                 # 상세 페이지에서 요약(summary) 추출 시도
                 summary = ""
                 try:
@@ -289,6 +293,10 @@ def crawl_krcert(db: Session):
                     if not title or len(title) < 5:
                         continue
                     
+                    # '[인사]' 또는 '[IP인사] 지식재산처'로 시작하는 제목 필터링
+                    if title.strip().startswith(('[인사]', '[IP인사] 지식재산처')):
+                        continue
+                    
                     # 중복 체크
                     existing = db.query(News).filter(News.url == link).first()
                     if existing:
@@ -370,6 +378,10 @@ def crawl_zdnet(db: Session):
                 if not title or len(title) < 5:
                     continue
                 
+                # '[인사]' 또는 '[IP인사] 지식재산처'로 시작하는 제목 필터링
+                if title.strip().startswith(('[인사]', '[IP인사] 지식재산처')):
+                    continue
+                
                 # 중복 체크
                 existing = db.query(News).filter(News.url == link).first()
                 if existing:
@@ -436,6 +448,10 @@ def crawl_cisa(db: Session):
                     link = 'https://www.cisa.gov' + link
                 
                 if not title or len(title) < 5:
+                    continue
+
+                # '[인사]' 또는 '[IP인사] 지식재산처'로 시작하는 제목 필터링
+                if title.strip().startswith(('[인사]', '[IP인사] 지식재산처')):
                     continue
                 
                 # 중복 체크
@@ -520,6 +536,10 @@ def _generic_crawl(db: Session, list_url: str, domain: str, source_label: str,
                     h1 = asoup.find('h1')
                     if h1: title = h1.get_text(strip=True)
                 if not title: continue
+
+                # '[인사]' 또는 '[IP인사] 지식재산처'로 시작하는 제목 필터링
+                if title.strip().startswith(('[인사]', '[IP인사] 지식재산처')):
+                    continue
 
                 # 요약 추출
                 summary = ''
