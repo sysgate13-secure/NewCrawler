@@ -115,7 +115,7 @@ async function fetchNews() {
         // totalItems 업데이트
         const totalItemsEl = document.getElementById('totalItems');
         if (totalItemsEl) {
-            totalItemsEl.textContent = data.pagination.total_items;
+            totalItemsEl.textContent = `총 ${data.pagination.total_items}개`;
         }
         
         renderPagination(totalPages, currentPage);

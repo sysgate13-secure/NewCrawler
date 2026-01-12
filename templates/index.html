@@ -51,19 +51,23 @@
                     </div>
                 </div>
 
-                <div id="pagination-controls" class="d-flex justify-content-between align-items-center">
-                    <div class="page-size-select">
-                        <label for="pageSize">항목 수:</label>
-                        <select id="pageSize" onchange="changeLimit(this.value)" class="form-select" style="width: auto; display: inline-block;">
-                            <option value="10" {% if pagination.limit == 10 %}selected{% endif %}>10</option>
-                            <option value="20" {% if pagination.limit == 20 %}selected{% endif %}>20</option>
-                            <option value="50" {% if pagination.limit == 50 %}selected{% endif %}>50</option>
-                            <option value="100" {% if pagination.limit == 100 %}selected{% endif %}>100</option>
-                        </select>
+                <div class="pagination-wrapper">
+                    <div class="d-flex justify-content-end align-items-center" style="margin-bottom: 0.5rem;">
+                        <div class="page-info-total">
+                            총 <strong id="totalItems">{{ pagination.total_items }}</strong>개
+                        </div>
                     </div>
-                    <nav id="pagination-nav"></nav>
-                    <div class="page-info-total">
-                        총 <strong id="totalItems">{{ pagination.total_items }}</strong>개
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center" style="gap: 0.5rem;">
+                            <label for="pageSize" style="margin: 0;">항목 수:</label>
+                            <select id="pageSize" onchange="changeLimit(this.value)" class="form-select" style="width: auto;">
+                                <option value="10" {% if pagination.limit == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if pagination.limit == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if pagination.limit == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if pagination.limit == 100 %}selected{% endif %}>100</option>
+                            </select>
+                        </div>
+                        <nav id="pagination-nav"></nav>
                     </div>
                 </div>
                 

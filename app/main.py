@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import engine, get_db, Base
 from app.models import News, Wiki, CrawlSource
 from crawler.crawler import crawl_all
+import time # Add this import
 from data_utils import get_wiki_preview, get_wiki_highlights, clean_news_summary
 from datetime import datetime
 import os
@@ -50,11 +51,15 @@ async def startup_event():
     if ES_ENABLED:
         import threading
         def init_es():
+            global ES_ENABLED # Declare intent to modify the global variable
             try:
+                # Give Elasticsearch a moment to fully start up
+                time.sleep(10) # Add a delay to allow ES to become fully ready
                 create_indices()
                 print("✅ Elasticsearch 인덱스 준비 완료")
             except Exception as e:
                 print(f"ℹ️ Elasticsearch가 실행 중이지 않아 검색 엔진 기능이 비활성화되었습니다. (SQLite는 정상 작동함)")
+                ES_ENABLED = False # Explicitly disable ES if initialization fails
         
         # 메인 루프를 방해하지 않도록 별도 스레드에서 실행
         threading.Thread(target=init_es, daemon=True).start()
